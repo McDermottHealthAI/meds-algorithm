@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked --extra test --group dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - run: uv build
+      - name: Verify standalone wheel and packaged specification
+        run: |
+          uv venv /tmp/core-wheel
+          uv pip install --python /tmp/core-wheel/bin/python dist/*.whl
+          /tmp/core-wheel/bin/python -c 'from meds_model_core.spec import specification; from meds_model_core.contracts.commands import MODEL_PROFILES; assert len(MODEL_PROFILES) == 6; assert "external_index_dir" in specification()'
