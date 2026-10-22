@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-INDEX_COLUMNS = ("subject_id", "prediction_time")
+from .validation import INDEX_COLUMNS, validate_keys, validate_splits
 
 
 def split_files(root: Path | str, splits: Sequence[str] | None = None) -> list[Path]:
@@ -13,16 +13,18 @@ def split_files(root: Path | str, splits: Sequence[str] | None = None) -> list[P
     root = Path(root)
     if isinstance(splits, str):
         raise TypeError("splits must be a sequence, not a string")
-    if splits is not None and (
-        not splits
-        or any(not isinstance(s, str) or not s.strip() for s in splits)
-        or len(set(splits)) != len(splits)
-    ):
-        raise ValueError("splits must be a nonempty sequence of unique names")
+    if splits is not None:
+        validate_splits(splits)
     candidates = sorted(root.rglob("*.parquet")) if root.is_dir() else [root]
     candidates = [p for p in candidates if p.is_file() and p.suffix == ".parquet"]
     if not candidates:
         raise FileNotFoundError(f"No parquet index files under {root}")
+    split_names = {"train", "tuning", "held_out", *(splits or ())}
+    for path in candidates:
+        parts = path.relative_to(root).parts[:-1] if root.is_dir() else (root.parent.name,)
+        identities = {path.stem, *parts, *([root.name] if root.is_dir() else [])} & split_names
+        if len(identities) > 1:
+            raise ValueError(f"Ambiguous split identity for {path}: {sorted(identities)}")
     if splits is None:
         return candidates
     selected: set[Path] = set()
@@ -50,8 +52,5 @@ def read_index(root: Path | str, splits: Sequence[str] | None = None):
             raise ValueError(f"Index file {path} is missing required key columns")
         frames.append(pl.read_parquet(path, columns=list(INDEX_COLUMNS)))
     index = pl.concat(frames)
-    if any(index[column].null_count() for column in INDEX_COLUMNS):
-        raise ValueError("the requested index contains null keys")
-    if index.unique().height != index.height:
-        raise ValueError("the requested index contains duplicate (subject_id, prediction_time)")
+    validate_keys(index, source="requested index")
     return index

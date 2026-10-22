@@ -25,4 +25,20 @@ jobs:
         run: |
           uv venv /tmp/core-wheel
           uv pip install --python /tmp/core-wheel/bin/python dist/*.whl
-          /tmp/core-wheel/bin/python -c 'from meds_model_core.spec import specification; from meds_model_core.contracts.commands import MODEL_PROFILES; assert len(MODEL_PROFILES) == 6; assert "external_index_dir" in specification()'
+          /tmp/core-wheel/bin/python tests/wheel_smoke.py
+  windows-wheel:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - name: Verify base wheel without Unix resource APIs
+        shell: pwsh
+        run: |
+          $coreEnv = Join-Path $env:RUNNER_TEMP "core-wheel"
+          uv venv $coreEnv
+          $corePython = Join-Path $coreEnv "Scripts/python.exe"
+          uv pip install --python $corePython (Get-ChildItem dist/*.whl).FullName
+          & $corePython tests/wheel_smoke.py

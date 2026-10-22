@@ -1,1 +1,1 @@
-"""Reserved extraction boundary for resource measurements and subprocess execution."""
+"""Optional-platform resource sampling, explicit model provenance and subprocess execution."""

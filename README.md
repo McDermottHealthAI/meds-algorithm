@@ -1,68 +1,95 @@
 # meds-model-core
 
-Shared contracts and reusable infrastructure for MEDS model repositories. This is an alpha: the contract and initial extractions are implemented; the remaining module boundaries are planned.
+Shared infrastructure for MEDS model repositories. Version 0.3.0a2 completes the extraction of the
+template's reusable contract, artifact, runtime, task, evaluation and conformance helpers. Every module
+below has an implementation; there are no reserved placeholder modules. The alpha release is pinned
+by Git commit while the API is reviewed. Existing model repositories are migrated separately.
 
-Implemented now: shared profile/command definitions, strict split selection, key-only index reading,
-and the single versioned contract document. Other module directories mark planned extraction ownership;
-they do not claim implementations that have not yet been migrated and tested.
+## Package layout
 
 ```text
-meds-model-core/
-├── pyproject.toml
-├── README.md                    # package layout, development and extraction status
-├── src/meds_model_core/
-│   ├── CONTRACT.md              # the only normative contract, included in the wheel
-│   ├── spec.py                  # meds-model-core-spec: read the installed version's contract
-│   ├── contracts/commands.py    # Command, StepSpec, ArtifactInput, profiles, dispatch
-│   ├── data/index.py            # strict split selection and key-only projection
-│   ├── artifacts/              # next: manifest, publication, compatibility, digests
-│   ├── runtime/                # next: process resources and subprocess utilities
-│   ├── tasks/                  # next: TaskSpec and relaxation ledger
-│   ├── evaluation/             # next: prediction validation and post-score truth join
-│   ├── integrations/           # next: MEDS-DEV registration and argument adaptation
-│   └── conformance/            # next: reusable assertions/fixtures, optional test dependencies
-└── tests/                      # package behavior and packaging-resource checks
+src/meds_model_core/
+├── CONTRACT.md                 # canonical normative specification, included in the wheel
+├── spec.py                     # installed specification reader
+├── contracts/commands.py       # profiles, command classes, step metadata, dispatch
+├── artifacts/
+│   ├── manifest.py             # measured artifacts, envelope reading and digests
+│   ├── publication.py          # unique staging, exclusive writers and overwrite rollback
+│   ├── inputs.py               # resolve recorded upstream artifact paths
+│   └── results.py              # structured run evidence
+├── runtime/
+│   ├── provenance.py           # explicitly supplied model checkout
+│   ├── resources.py            # process-tree memory sampling and platform fallback
+│   └── process.py              # bounded subprocess execution
+├── data/                       # split selection, key-only index reads, context targets
+├── tasks/spec.py               # TaskSpec and RelaxationLedger
+├── evaluation/predictions.py   # keyed probabilities and post-score truth attachment
+├── integrations/meds_dev.py    # per-profile registration and CLI
+└── conformance/                # assertions, synthetic fixtures, full-lifecycle checks,
+                               # opt-in MEDS-DEV provisioning and model adapter result types
 ```
 
-The [template](https://github.com/florian6973/MEDS_model_template) re-exports extracted APIs
-and pins an exact commit of this repository. This alpha is installable from Git; no PyPI release is
-required. Upgrade the dependency pin through a reviewed change in each consumer.
+## Installation and dependencies
+
+Install a reviewed revision with
+`pip install 'meds-model-core @ git+https://github.com/florian6973/meds-model-core.git@<full-commit-sha>'`.
+The template records the exact SHA. No PyPI release is required.
+
+- Base package: PyYAML; no dataframe engine, test runner, GPU or model framework is imported by base APIs.
+- `data` extra: Polars for index/target reads and prediction validation.
+- `conformance` extra: pytest, Polars, PyArrow and the pinned MEDS evaluation schema implementation.
+- `test` extra: dependencies for developing and testing this package.
+
+The installed CLI provides `meds-model-core-spec`, `meds-model-resolve-input`, and
+`meds-model-add-to-meds-dev`. Model repositories provide their own `meds-model` entry point.
+
+## Ownership
+
+The template imports this package directly; it does not generate a `meds_model_contract` package or
+copy these implementations. Generated files contain model command skeletons, selected profile YAMLs,
+execution adapters in `tests/e2e.py`, model-specific tests, and project/cluster configuration.
+Family sharing belongs inside one model-family repository with several profiles. Tokenizers,
+architectures, objectives, payload layouts and task translators remain model-owned.
+
+`CONTRACT.md` is the only normative document. Template documentation renders it from the installed
+package. Model `SPEC.md` files point to it; model implementation reports record local decisions.
+
+## Publication, provenance and measurement
+
+Pass the model checkout explicitly to `measured_artifact(..., repo=model_root)`. The package never
+infers the model from its own installation path or the working directory. Without a supplied checkout,
+commit and dirty state are unknown (`null`); wheel deployments must retain model build provenance
+separately rather than inventing a checkout revision.
+
+Publication uses a unique sibling staging directory and an exclusive destination lock. A new artifact
+appears in one rename. Overwrite retains the old directory as a backup until the new directory is
+published, and restores it if publication fails. Replacement uses two renames, so concurrent readers
+can briefly observe an absent destination. Prefer immutable output paths for concurrent readers.
+This is not a power-loss transaction: after a process crash, inspect the `.lock`, `.staging-*` and
+`.backup-*` siblings before manually recovering. If restoration itself fails, the exception names the
+preserved backup; it is never silently deleted. Locks apply to cooperating core writers.
+
+Linux sampling visits the children of every process thread, including subprocesses launched by worker
+threads. Sampling can miss short-lived peaks; inaccessible descendants are not a complete measurement.
+On platforms without `/proc`, use process-only `getrusage` when available; otherwise report unavailable
+values as `null`. GPU instrumentation remains the model/framework's responsibility.
+
+## Validation
 
 ```bash
 uv sync --extra test --group dev
-uv run pytest
 uv run ruff check .
 uv run ruff format --check .
+uv run pytest -q
 uv build
-uv run meds-model-core-spec
 ```
 
-To install without a checkout, use `pip install 'meds-model-core[data] @
-git+https://github.com/florian6973/meds-model-core.git@<full-commit-sha>'` (on one line).
-Generated repositories record the actual immutable SHA in their dependency declaration.
+Tests inject publication/restoration failures, launch a child from a worker thread, check explicit
+model provenance, reject missing/mixed/overlapping label inputs, and exercise all six lifecycles with
+synthetic command implementations. Full-lifecycle conformance reruns model adapters with forbidden
+outcomes removed and fresh artifacts; model-specific cutoff, frozen-weight, compatibility and primary
+behavior tests remain required. Package tests do not establish scientific validity of a downstream model.
 
-The root `README` explains use; `CONTRACT.md` defines normative behavior. Generated `SPEC.md` files are
-short pointers to the installed core version, not copies. The documentation site includes that same
-source file. API reference pages link to it instead of maintaining another argument table. Model
-repositories keep only their own implementation decisions, supported profiles and evidence.
-
-Family sharing belongs in **one repository per model family with multiple profiles** where appropriate:
-for example one MOTOR implementation with fine-tuning/probing/direct-query adapters. Family-specific
-tokenizers, objectives, pooling and task translators stay there, outside the generic core. The 15 existing
-repositories are not merged or changed by this scaffold.
-
-## Extraction sequence
-
-1. Contracts, index projection and canonical documentation: implemented in this package.
-2. Artifacts/provenance/runtime: reconcile the four existing manifest variants; fix publication rollback
-   and process-tree sampling defects before extracting. Test failure paths and compatibility decisions.
-3. Task/evaluation helpers: separate label reads from index reads and evaluation-only truth attachment;
-   test absent/conflicting splits, duplicated keys and forbidden-label access.
-4. MEDS-DEV/conformance: migrate registration and reusable assertions; retain model-owned execution hooks,
-   CLI stubs, profile YAML, CI and editable cluster policy in the template/model repository.
-5. Build/publish the alpha, pilot a tabular model and a multi-profile neural family, then open tested
-   dependency-update PRs. Remove local compatibility implementations as each shared module becomes canonical.
-
-The core stays independent of Torch, JAX, Lightning, FEMR, XGBoost and ACES model adapters. Data/test
-dependencies are extras. Future runtime GPU integrations must be optional. Package upgrades and
-scientific model revisions remain separately reviewable changes.
+MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selection; setting
+`MEDS_DEV_DIR` only supplies a source checkout. Unit tests do not download a real dataset or launch
+training. Keep each model's data-access and cluster approval rules in its own repository.

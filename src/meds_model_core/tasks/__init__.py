@@ -1,1 +1,1 @@
-"""Reserved extraction boundary for TaskSpec and relaxation ledgers; no model-specific translators."""
+"""Task identity and declared semantic relaxations."""

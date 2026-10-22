@@ -1,1 +1,1 @@
-"""Reserved optional test helpers; concrete model execution remains a model-repository adapter."""
+"""Reusable assertions, synthetic fixtures and explicitly opted-in integration provisioning."""

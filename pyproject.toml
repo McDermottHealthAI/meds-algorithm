@@ -4,19 +4,23 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meds-model-core"
-version = "0.3.0a1"
+version = "0.3.0a2"
 description = "Shared MEDS model contracts and conformance boundaries."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
+dependencies = ["pyyaml>=6"]
 
 [project.optional-dependencies]
 data = ["polars>=1"]
-test = ["pytest>=8", "polars>=1"]
+conformance = ["pytest>=8", "polars>=1", "pyarrow>=15", "meds-evaluation==0.0.3"]
+test = ["pytest>=8", "polars>=1", "pyarrow>=15", "meds-evaluation==0.0.3"]
 
 [project.scripts]
 meds-model-core-spec = "meds_model_core.spec:main"
+meds-model-resolve-input = "meds_model_core.artifacts.inputs:main"
+meds-model-add-to-meds-dev = "meds_model_core.integrations.meds_dev:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/meds_model_core"]

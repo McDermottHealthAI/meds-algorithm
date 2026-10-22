@@ -1,1 +1,1 @@
-"""Reserved boundary for MEDS-DEV descriptor registration and input-role mapping."""
+"""Repository registration and external runner adapters."""

@@ -50,7 +50,7 @@ the same files, not permission to load their outcome columns. A physically separ
 also supported. Neither representation rebuilds or filters the upstream cohort.
 
 Once scores are fixed, an evaluation adapter MAY use `external_evaluation_labels_dir` to join truth onto the
-predictions by key (`meds_model_contract.attach_ground_truth`), because meds-evaluation reads ground truth
+predictions by key (`meds_model_core.attach_ground_truth`), because meds-evaluation reads ground truth
 from the predictions file. Nothing computed from that join may feed back into a prediction.
 
 The cohort is built upstream, not in the model repository. The index and its labels come from one
@@ -80,7 +80,7 @@ A supervised model learns what to predict from labels. A zero-shot model never s
 definition itself is an input. The task language is [ACES](https://eventstreamaces.readthedocs.io/): a task
 is an ACES criteria file, supplied through `external_task_criteria_file`, bound to the dataset predicates of
 section 2.3 when the criteria do not define their own. The pair is the *task specification*
-(`meds_model_contract.TaskSpec`).
+(`meds_model_core.TaskSpec`).
 
 - Every command of a `zero_shot_*` profile whose output depends on the task (`ZERO_SHOT_TASK_COMMANDS`:
   `predict_zero_shot_direct` and `predict_zero_shot_materialized`) MUST receive `external_task_criteria_file`, MUST
@@ -92,7 +92,7 @@ section 2.3 when the criteria do not define their own. The pair is the *task spe
   `TASK_PREDICATES_FILE`. Through MEDS-DEV there is no conflict, because its task YAMLs carry their label
   predicates and `{predicates_path}` holds dataset facts only.
 - Those commands receive the task index through `external_index_dir` for its keys only. They MUST read it
-  through `meds_model_contract.read_index`, or an equivalent that never selects a label column.
+  through `meds_model_core.read_index`, or an equivalent that never selects a label column.
 - Through MEDS-DEV, the criteria path reaches `models/<profile>/model.yaml` as `{task_criteria_path}` (MEDS-DEV PR #330):
   the `task_criteria_path` argument, else the registered criteria file of `task_name`. MEDS-DEV forwards
   the original task; relaxing it is the model's job.
@@ -151,7 +151,7 @@ implementation-defined, as in section 4.
 
 **Relaxations.** Most zero-shot models cannot answer an arbitrary ACES task exactly; they answer a related
 question their query language can express. Every zero-shot run MUST therefore publish `relaxations.yaml`
-(`meds_model_contract.RelaxationLedger`) in a task-conditioned artifact. Three fields are required:
+(`meds_model_core.RelaxationLedger`) in a task-conditioned artifact. Three fields are required:
 
 ```yaml
 query_language: MOTOR first-occurrence time-to-event over task-head codes   # required
@@ -171,7 +171,7 @@ small.
 
 ## 4. Intermediate artifacts
 
-Every artifact directory MUST contain `manifest.yaml`, written last through atomic publication. Required
+Every artifact directory MUST contain `manifest.yaml`, written last in staging before publication. Required
 envelope fields are:
 
 ```yaml
@@ -191,14 +191,20 @@ semantics_digest: null | sha256:...  # TaskSpec digest for task-conditioned arti
 resources: {}
 ```
 
-`config_digest` is `meds_model_contract.digest_config` over the command's arguments plus any model-owned
+`config_digest` is `meds_model_core.digest_config` over the command's arguments plus any model-owned
 settings it resolved (defaults, configuration files), so two artifacts made with the same configuration
-share it. `code` is recorded automatically by `measured_artifact`: a run from a modified tree is
-identifiable as such. Inputs MUST include stable identifiers or digests, including an external predicates
+share it. `code` is recorded by `measured_artifact(..., repo=model_root)` from the explicitly supplied model
+checkout. The core installation path and current directory MUST NOT be used to infer model identity.
+Without a checkout, revision and dirty state remain null; deployed models must retain their build provenance. Inputs MUST include stable identifiers or digests, including an external predicates
 digest when the command consumes one. Consumers MUST reject incompatible artifact type, contract version,
 or payload format before doing expensive work.
 
-Each artifact is its own directory, published by atomically replacing that directory. Artifacts MUST NOT
+Each artifact is its own directory. New outputs are published by one rename from unique staging.
+Overwriting an existing output MUST preserve or restore the previous artifact if publication fails.
+The core serializes cooperating writers with an exclusive destination lock and retains an old backup
+until replacement succeeds. Its two-rename overwrite can briefly hide the destination from readers;
+use immutable output paths when concurrent readers require uninterrupted access. A process crash can
+leave a lock/staging/backup for explicit recovery; this is not a power-loss transaction. Artifacts MUST NOT
 be nested inside one another: `infer_embeddings` writes to `output_embeddings_dir` and `infer_trajectories` to `output_trajectories_dir`, a sibling of the data and
 predictions directories, never to a subdirectory of the shared `patients` artifact, so runs over different
 indexes or splits cannot overwrite each other. In a MEDS-DEV run directory the layout is `data/`,
@@ -264,7 +270,7 @@ portable pass/fail thresholds.
   exact `predict` arguments it used, and MUST apply `tests.signal.add_split_canaries` to its fixture and
   return the canaries. `fitted_codes` MUST report every code the model fitted a population statistic for,
   read from its artifacts.
-- `meds-model-add-to-meds-dev` (`meds_model_contract.meds_dev.register`) installs `models/<profile>/model.yaml` and
+- `meds-model-add-to-meds-dev` (`meds_model_core.meds_dev.register`) installs `models/<profile>/model.yaml` and
   `requirements.txt`, with the repository as an editable requirement, into a MEDS-DEV checkout. A
   top-level `predicates.yaml` is copied as well when the repository has one. MEDS-DEV's own dataset
   predicates remain the default (section 2.3).
@@ -284,7 +290,7 @@ portable pass/fail thresholds.
 ## 8. Conformance
 
 The generated repository MUST test command discovery, selected-model-profile consistency, artifact compatibility,
-atomic publication, predicate provenance, prediction key coverage/uniqueness, absence of label
+publication and rollback, predicate provenance, prediction key coverage/uniqueness, absence of label
 leakage and of transductive fitting (section 2.1), resource measurement presence, `models/<profile>/model.yaml`, SLURM
 dry-run, and its real end-to-end chain. The rendered `tests/test_end_to_end.py` does so in one real run:
 
@@ -485,7 +491,9 @@ verify the encoder remains frozen; finetuning tests must verify the declared upd
 tests must verify per-key samples and horizon handling. The template cannot infer these from opaque
 payloads. Implement these model-specific assertions rather than relying only on dispatch tests.
 
-The default label-blind prediction rerun checks the prediction path. It does not by itself prove that
-earlier artifacts did not cache held-out labels: each implementation must additionally rerun the full
-lifecycle with forbidden label columns removed and fresh output directories. Include all external
-inputs in `E2EResult.inputs` so that this test can reproduce the same histories and task.
+The shared `assert_profile_run` conformance helper reruns the full lifecycle through `run_e2e` with
+forbidden label columns removed. It requires fresh artifacts below a new run directory and preserves
+permitted training/context labels. Include `external_meds_dir` and all task inputs in `E2EResult.inputs`
+so the check uses the same histories and task. This detects forbidden reads on the exercised path;
+it does not prove all possible code paths, temporal cutoffs, or absence of labels encoded in other
+features. Implement the corresponding model-specific checks as well.

@@ -82,3 +82,11 @@ def test_specification_is_an_installed_package_resource():
     assert "# MEDS Model Repository Contract, version 3" in spec
     assert "Ground-truth target values the model may use" in spec
     assert "external_index_dir" in spec
+
+
+def test_conflicting_split_names_never_select_evaluation_as_training(tmp_path):
+    path = labelled_file(tmp_path / "train/held_out.parquet")
+    with pytest.raises(ValueError, match="Ambiguous split"):
+        split_files(tmp_path, ["train"])
+    with pytest.raises(ValueError, match="Ambiguous split"):
+        split_files(path, ["train"])
