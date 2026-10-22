@@ -1,9 +1,11 @@
 # meds-model-core
 
-Shared infrastructure for MEDS model repositories. Version 0.3.0a2 completes the extraction of the
-template's reusable contract, artifact, runtime, task, evaluation and conformance helpers. Every module
-below has an implementation; there are no reserved placeholder modules. The alpha release is pinned
-by Git commit while the API is reviewed. Existing model repositories are migrated separately.
+Shared infrastructure for implementing and validating MEDS model repositories. The package defines
+model profiles and command contracts, manages artifacts and run provenance, reads prediction indices
+and training targets, validates prediction outputs, and provides reusable conformance tests.
+
+Model repositories import these utilities so fixes can be distributed through a package update.
+Model architectures, tokenizers, training objectives and task-specific logic stay in the model repository.
 
 ## Package layout
 
@@ -33,7 +35,8 @@ src/meds_model_core/
 
 Install a reviewed revision with
 `pip install 'meds-model-core @ git+https://github.com/florian6973/meds-model-core.git@<full-commit-sha>'`.
-The template records the exact SHA. No PyPI release is required.
+The template currently records the exact SHA. For package-index release checks and publishing setup,
+see the [release guide](https://github.com/florian6973/meds-model-core/blob/main/RELEASING.md).
 
 - Base package: PyYAML; no dataframe engine, test runner, GPU or model framework is imported by base APIs.
 - `data` extra: Polars for index/target reads and prediction validation.
@@ -93,3 +96,21 @@ behavior tests remain required. Package tests do not establish scientific validi
 MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selection; setting
 `MEDS_DEV_DIR` only supplies a source checkout. Unit tests do not download a real dataset or launch
 training. Keep each model's data-access and cluster approval rules in its own repository.
+
+## Changes
+
+### 0.3.0a2
+
+- Complete the extraction of shared artifact, runtime, data, task, evaluation, MEDS-DEV and
+  conformance utilities from the template; replace the reserved placeholder modules with implementations.
+- Add exclusive artifact writers, overwrite rollback, explicit model-checkout provenance and
+  process-tree memory sampling with platform fallbacks.
+- Reject ambiguous splits, overlapping context/evaluation keys, invalid probabilities and malformed
+  artifact manifests; rerun complete profile lifecycles to check for outcome-label leakage.
+- Make the core package the source of the contract and shared tests, removing generated copies from
+  the template. Migration of existing model repositories is separate.
+
+### 0.3.0a1
+
+- Introduce contract version 3, profile/command definitions, the installed specification reader and
+  a key-only prediction index reader.

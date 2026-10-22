@@ -21,11 +21,21 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pytest -q
       - run: uv build
+      - name: Validate distribution metadata and PyPI README rendering
+        run: uvx --from 'twine>=6' twine check --strict dist/*
       - name: Verify standalone wheel and packaged specification
         run: |
           uv venv /tmp/core-wheel
           uv pip install --python /tmp/core-wheel/bin/python dist/*.whl
           /tmp/core-wheel/bin/python tests/wheel_smoke.py
+      - name: Run conformance tests against the installed wheel outside the checkout
+        run: |
+          wheel=$(realpath dist/*.whl)
+          uv pip install --python /tmp/core-wheel/bin/python "${wheel}[conformance]"
+          uv pip check --python /tmp/core-wheel/bin/python
+          cp -r tests /tmp/core-wheel-tests
+          cd /tmp
+          /tmp/core-wheel/bin/python -I -m pytest -q /tmp/core-wheel-tests
   windows-wheel:
     runs-on: windows-latest
     steps:
