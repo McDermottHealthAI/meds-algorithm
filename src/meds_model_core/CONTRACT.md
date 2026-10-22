@@ -1,4 +1,4 @@
-# MEDS Model Repository Contract, version 3 draft
+# MEDS Model Repository Contract, version 3
 
 This document is the single authoritative contract shipped with meds-model-core. Model repositories
 pin a core version and refer to its contract; they do not maintain copies of these rules. A conforming repository turns a MEDS dataset, an optional task, and an optional semantic
