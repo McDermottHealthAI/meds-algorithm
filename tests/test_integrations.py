@@ -29,3 +29,17 @@ def test_registration_is_per_profile_and_rejects_escape(tmp_path):
     target = register(model, dev, "family", "probe")
     assert target.name == "family__probe"
     assert str(model) in (target / "requirements.txt").read_text()
+
+
+def test_registration_writes_an_unquoted_editable_file_url(tmp_path):
+    # uv treats quotes in a requirements file literally; a percent-encoded file URL survives spaces.
+    model = tmp_path / "my model"
+    (model / "models/supervised").mkdir(parents=True)
+    (model / "models/supervised/model.yaml").write_text("commands: {}")
+    (model / "requirements.txt").write_text("numpy\n-e .\n")
+    dev = tmp_path / "dev"
+    (dev / "src/MEDS_DEV/models").mkdir(parents=True)
+    target = register(model, dev, "family", "supervised")
+    lines = (target / "requirements.txt").read_text().splitlines()
+    assert lines == ["numpy", f"-e {model.resolve().as_uri()}"]
+    assert "%20" in lines[1] and '"' not in lines[1]

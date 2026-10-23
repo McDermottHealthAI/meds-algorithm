@@ -25,10 +25,10 @@ def register(repo: Path, meds_dev: Path, name: str, profile: str | None = None) 
     if not target.parent.is_dir():
         raise FileNotFoundError(f"{meds_dev} has no src/MEDS_DEV/models directory")
     requirements = (source / "requirements.txt").read_text()
+    # A file URL needs no quoting: uv reads quotes in requirement files literally, and pip splits on spaces.
     requirements = (
         "\n".join(
-            f'-e "{source.as_posix()}"' if line.strip() == "-e ." else line
-            for line in requirements.splitlines()
+            f"-e {source.as_uri()}" if line.strip() == "-e ." else line for line in requirements.splitlines()
         )
         + "\n"
     )
