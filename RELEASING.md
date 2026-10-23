@@ -38,7 +38,7 @@ test_env=$(mktemp -d)
 uv venv "$test_env"
 uv pip install --python "$test_env/bin/python" 'pyyaml>=6'
 uv pip install --python "$test_env/bin/python" \
-  --index-url https://test.pypi.org/simple/ --no-deps 'meds-model-core==0.3.0a2'
+  --index-url https://test.pypi.org/simple/ --no-deps 'meds-model-core==0.3.0a3'
 "$test_env/bin/python" -I tests/wheel_smoke.py
 uv pip check --python "$test_env/bin/python"
 ```
