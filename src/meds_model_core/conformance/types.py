@@ -11,7 +11,8 @@ class E2EResult:
     artifacts: Mapping[str, Path]
     labels_dir: Path
     splits: Sequence[str]
-    # The external inputs passed to the commands. Zero-shot profiles MUST include external_task_criteria_file
+    # External inputs and the integer seed honored by run_e2e.
+    # Zero-shot profiles MUST include external_task_criteria_file
     # (and external_predicates_file when used) so tests can check which task each artifact answers.
     inputs: Mapping[str, Any] = field(default_factory=dict)
     # Codes added by conformance.signal.add_split_canaries to tuning and held-out subjects.

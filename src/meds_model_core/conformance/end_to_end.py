@@ -1,5 +1,6 @@
 """Reusable end-to-end conformance; execution and fitted-feature inspection are model-owned."""
 
+from contextlib import suppress
 from pathlib import Path
 
 from meds_model_core import (
@@ -12,7 +13,7 @@ from meds_model_core import (
     read_manifest,
 )
 
-from .assertions import assert_prediction_keys, assert_prediction_schema
+from .assertions import assert_prediction_keys, read_predictions
 
 
 def _strip_labels(labels_dir: Path, destination: Path, splits) -> Path:
@@ -21,7 +22,13 @@ def _strip_labels(labels_dir: Path, destination: Path, splits) -> Path:
 
     from meds_model_core import split_files
 
-    stripped = set(split_files(labels_dir, splits))
+    labels_dir = Path(labels_dir)
+    files = split_files(labels_dir)
+    stripped = set(files) if splits is None else set()
+    for split in splits or ():
+        # A separate training/context root need not contain any evaluated split.
+        with suppress(FileNotFoundError):
+            stripped.update(split_files(labels_dir, [split]))
     for path in split_files(labels_dir):
         target = destination / (path.relative_to(labels_dir) if Path(labels_dir).is_dir() else path.name)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -51,9 +58,7 @@ def assert_profile_run(result, *, profile, run_e2e, fitted_codes, tmp_path):
         else:
             assert memory["peak_process_tree_rss_bytes"] > 0
     prediction_step = MODEL_PROFILES[profile][-1].value
-    import polars as pl
-
-    assert_prediction_schema(pl.read_parquet(artifacts[prediction_step] / "predictions.parquet"))
+    read_predictions(artifacts[prediction_step])
     prediction_manifest = read_manifest(artifacts[prediction_step])
     assert prediction_manifest["artifact"]["type"] == "predictions"
     assert_prediction_keys(artifacts[prediction_step], result.labels_dir, result.splits)
@@ -87,24 +92,25 @@ def assert_profile_run(result, *, profile, run_e2e, fitted_codes, tmp_path):
 def assert_label_blind_pipeline(result, *, profile, run_e2e, tmp_path):
     """Rerun every stage on the same histories with forbidden outcomes absent and fresh artifacts."""
     assert result.inputs.get("external_meds_dir"), "E2EResult.inputs must record external_meds_dir"
-    unlabelled = _strip_labels(
-        result.labels_dir,
-        tmp_path / "unlabelled-index",
-        None if profile.startswith("zero_shot_") else result.splits,
-    )
+    assert type(result.inputs.get("seed")) is int, "E2EResult.inputs must record the run_e2e seed"
+    expected_steps = [step.value for step in MODEL_PROFILES[profile]]
+    original = read_predictions(result.artifacts[expected_steps[-1]])
+    overrides = dict(result.inputs)
+    for argument in ("external_labels_dir", "external_index_dir", "external_evaluation_labels_dir"):
+        overrides[argument] = _strip_labels(
+            result.inputs.get(argument) or result.labels_dir,
+            tmp_path / "unlabelled-inputs" / argument,
+            None if profile.startswith("zero_shot_") else result.splits,
+        )
     fresh_root = tmp_path / "label-blind-run"
     blind = run_e2e(
         fresh_root,
         profile=profile,
         **{
-            **result.inputs,
-            "external_labels_dir": unlabelled,
-            "external_index_dir": unlabelled,
-            "external_evaluation_labels_dir": unlabelled,
+            **overrides,
             "splits": result.splits,
         },
     )
-    expected_steps = [step.value for step in MODEL_PROFILES[profile]]
     assert list(blind.artifacts) == expected_steps, "label-blind check must execute the full lifecycle"
     old_paths = {Path(path).resolve() for path in result.artifacts.values()}
     for step, path in blind.artifacts.items():
@@ -119,9 +125,26 @@ def assert_label_blind_pipeline(result, *, profile, run_e2e, tmp_path):
     assert_prediction_keys(prediction, result.labels_dir, result.splits)
     # Do not require the evaluation-only boolean_value on a deliberately unlabelled run.
     import polars as pl
+    from polars.testing import assert_frame_equal
 
     from ..data.index import read_index
     from ..evaluation.predictions import check_decoded
 
-    frames = [pl.read_parquet(path) for path in sorted(Path(prediction).rglob("*.parquet"))]
-    check_decoded(read_index(result.labels_dir, result.splits), pl.concat(frames))
+    blind_predictions = read_predictions(prediction, require_truth=False)
+    check_decoded(read_index(result.labels_dir, result.splits), blind_predictions)
+    columns = ["subject_id", "prediction_time", "predicted_boolean_probability"]
+    if "predicted_boolean_value" in original.columns:
+        columns.append("predicted_boolean_value")
+    try:
+        assert_frame_equal(
+            original.select(columns).sort(columns[:2]),
+            blind_predictions.select(columns).sort(columns[:2]),
+            check_exact=False,
+            rel_tol=1e-6,
+            abs_tol=1e-8,
+        )
+    except (AssertionError, pl.exceptions.ColumnNotFoundError) as error:
+        raise AssertionError(
+            "Predictions changed when forbidden labels were removed; fix leakage or make the "
+            "conformance fixture reproducible with the recorded seed"
+        ) from error

@@ -4,7 +4,23 @@ import polars as pl
 import pytest
 
 from meds_model_core import attach_ground_truth, check_decoded, read_context_labels
-from meds_model_core.conformance.assertions import assert_prediction_keys
+from meds_model_core.conformance.assertions import assert_prediction_keys, read_predictions
+
+
+def test_every_prediction_shard_is_validated_and_duplicate_keys_fail(tmp_path):
+    first = frame().with_columns(pl.lit(0.5).alias("predicted_boolean_probability"))
+    second = frame(2).with_columns(pl.lit(0.7).alias("predicted_boolean_probability"))
+    first.write_parquet(tmp_path / "0.parquet")
+    second.write_parquet(tmp_path / "1.parquet")
+    assert read_predictions(tmp_path).height == 2
+    second.with_columns(pl.lit(float("nan")).alias("predicted_boolean_probability")).write_parquet(
+        tmp_path / "1.parquet"
+    )
+    with pytest.raises(ValueError, match="probability"):
+        read_predictions(tmp_path)
+    first.write_parquet(tmp_path / "1.parquet")
+    with pytest.raises(ValueError, match="duplicate"):
+        read_predictions(tmp_path)
 
 
 def frame(subject=1, labelled=True):
@@ -44,6 +60,18 @@ def test_context_cannot_overlap_evaluated_keys_under_another_split_name(tmp_path
         read_context_labels(tmp_path, ["train"], ["held_out"])
     with pytest.raises(ValueError, match="splits"):
         read_context_labels(tmp_path, ["train"], "held_out")
+
+
+def test_context_checks_actual_separate_evaluation_index(tmp_path):
+    labels, index = tmp_path / "labels", tmp_path / "index"
+    labels.mkdir()
+    index.mkdir()
+    frame().write_parquet(labels / "train.parquet")
+    frame(2, labelled=False).write_parquet(index / "held_out.parquet")
+    assert read_context_labels(labels, ["train"], ["held_out"], evaluation_index_dir=index).height == 1
+    frame(labelled=False).write_parquet(index / "held_out.parquet")
+    with pytest.raises(ValueError, match="disjoint"):
+        read_context_labels(labels, ["train"], ["held_out"], evaluation_index_dir=index)
 
 
 @pytest.mark.parametrize("probability", [float("nan"), float("inf"), -0.1, 1.1, None])

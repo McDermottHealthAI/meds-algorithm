@@ -33,6 +33,7 @@ def pipeline(tmp_path):
 
     def run(path, *, profile, **overrides):
         inputs = {
+            "seed": 0,
             "external_meds_dir": histories,
             "external_task_criteria_file": criteria,
             "external_labels_dir": labels,
@@ -74,6 +75,81 @@ def pipeline(tmp_path):
         )
 
     return run
+
+
+def check(result, runner, tmp_path):
+    assert_profile_run(
+        result, profile="supervised", run_e2e=runner, fitted_codes=lambda _: set(), tmp_path=tmp_path
+    )
+
+
+def test_optional_label_leakage_changes_scores_and_fails(tmp_path, pipeline):
+    def leaky(path, *, profile, **inputs):
+        result = pipeline(path, profile=profile, **inputs)
+        labels = pl.read_parquet(result.labels_dir / "held_out.parquet")
+        value = (
+            labels["boolean_value"].cast(pl.Float64)
+            if "boolean_value" in labels.columns
+            else pl.Series([0.25])
+        )
+        output = result.artifacts["predict_supervised"] / "predictions.parquet"
+        pl.read_parquet(output).with_columns(value.alias("predicted_boolean_probability")).write_parquet(
+            output
+        )
+        return result
+
+    result = leaky(tmp_path / "original", profile="supervised")
+    with pytest.raises(AssertionError, match="Predictions changed"):
+        check(result, leaky, tmp_path / "checks")
+
+
+@pytest.mark.parametrize("probability", [float("nan"), float("inf"), -0.1, 1.1])
+def test_original_invalid_scores_fail_before_rerun(tmp_path, pipeline, probability):
+    result = pipeline(tmp_path / "original", profile="supervised")
+    output = result.artifacts["predict_supervised"] / "predictions.parquet"
+    pl.read_parquet(output).with_columns(
+        pl.lit(probability).alias("predicted_boolean_probability")
+    ).write_parquet(output)
+    with pytest.raises(ValueError, match="probability"):
+        check(result, lambda *a, **kw: pytest.fail("must reject original first"), tmp_path / "checks")
+
+
+def test_sharded_predictions_and_separate_training_roots(tmp_path, pipeline):
+    import shutil
+
+    from meds_model_core.data.labels import read_targets
+
+    initial = pipeline(tmp_path / "setup", profile="supervised")
+    training, index = tmp_path / "training", tmp_path / "index"
+    training.mkdir()
+    index.mkdir()
+    for split in ("train", "tuning"):
+        shutil.copy2(initial.labels_dir / f"{split}.parquet", training / f"{split}.parquet")
+    shutil.copy2(initial.labels_dir / "held_out.parquet", index / "held_out.parquet")
+
+    def separated(path, *, profile, **inputs):
+        inputs = {
+            "external_labels_dir": training,
+            "external_index_dir": index,
+            "external_evaluation_labels_dir": index,
+            **inputs,
+        }
+        targets = read_targets(inputs["external_labels_dir"], ["train", "tuning"])
+        assert targets["boolean_value"].to_list() == [True, True]
+        result = pipeline(path, profile=profile, **inputs)
+        output = result.artifacts["predict_supervised"]
+        (output / "held_out").mkdir()
+        (output / "predictions.parquet").rename(output / "held_out/0.parquet")
+        return result
+
+    check(separated(tmp_path / "original", profile="supervised"), separated, tmp_path / "checks")
+
+
+def test_reproducible_seed_is_required(tmp_path, pipeline):
+    result = pipeline(tmp_path / "original", profile="supervised")
+    result.inputs.pop("seed")
+    with pytest.raises(AssertionError, match="seed"):
+        check(result, pipeline, tmp_path / "checks")
 
 
 @pytest.mark.parametrize("profile", list(MODEL_PROFILES))

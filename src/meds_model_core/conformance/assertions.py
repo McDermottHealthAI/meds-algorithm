@@ -1,6 +1,26 @@
 from pathlib import Path
 
 from ..data.index import read_index
+from ..evaluation.predictions import check_decoded
+
+
+def read_predictions(predictions_dir: Path, *, require_truth: bool = True):
+    """Read every prediction shard, validating each shard's schema and probability values."""
+    import polars as pl
+
+    paths = sorted(Path(predictions_dir).rglob("*.parquet"))
+    if not paths:
+        raise FileNotFoundError(f"No prediction parquet files under {predictions_dir}")
+    frames = []
+    for path in paths:
+        frame = pl.read_parquet(path)
+        if require_truth:
+            assert_prediction_schema(frame)
+        check_decoded(frame.select("subject_id", "prediction_time"), frame)
+        frames.append(frame)
+    combined = pl.concat(frames, how="diagonal_relaxed")
+    check_decoded(combined.select("subject_id", "prediction_time"), combined)
+    return combined
 
 
 def assert_prediction_keys(predictions_dir: Path, labels_dir: Path, splits) -> None:

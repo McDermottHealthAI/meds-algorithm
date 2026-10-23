@@ -35,7 +35,11 @@ def read_targets(root: Path | str, splits: Sequence[str], *, allow_unlabelled=Fa
 
 
 def read_context_labels(
-    labels_dir: Path | str, context_splits: Sequence[str], evaluated_splits: Sequence[str]
+    labels_dir: Path | str,
+    context_splits: Sequence[str],
+    evaluated_splits: Sequence[str],
+    *,
+    evaluation_index_dir: Path | str | None = None,
 ) -> pl.DataFrame:
     """Read disjoint labelled context; neither split names nor keys may overlap evaluation."""
     validate_splits(context_splits)
@@ -43,7 +47,9 @@ def read_context_labels(
     if set(context_splits) & set(evaluated_splits):
         raise ValueError("context splits must be disjoint from evaluated splits")
     context = read_targets(labels_dir, context_splits)
-    evaluated = read_index(labels_dir, evaluated_splits)
+    evaluated = read_index(
+        labels_dir if evaluation_index_dir is None else evaluation_index_dir, evaluated_splits
+    )
     if context.select(INDEX_COLUMNS).join(evaluated, on=list(INDEX_COLUMNS), how="inner").height:
         raise ValueError("context keys must be disjoint from evaluated keys")
     return context

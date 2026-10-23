@@ -99,6 +99,14 @@ training. Keep each model's data-access and cluster approval rules in its own re
 
 ## Changes
 
+### 0.3.0a3
+
+- Compare seeded full-lifecycle predictions with and without forbidden labels, preserving separate
+  training, index and evaluation inputs.
+- Validate original and rerun probabilities across every prediction shard, and accept a separate
+  evaluation index when checking context-label overlap.
+- Terminate subprocess trees on timeout or interruption; deliberately detached services are unsupported.
+
 ### 0.3.0a2
 
 - Complete the extraction of shared artifact, runtime, data, task, evaluation, MEDS-DEV and

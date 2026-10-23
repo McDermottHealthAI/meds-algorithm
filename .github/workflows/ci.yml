@@ -52,3 +52,5 @@ jobs:
           $corePython = Join-Path $coreEnv "Scripts/python.exe"
           uv pip install --python $corePython (Get-ChildItem dist/*.whl).FullName
           & $corePython tests/wheel_smoke.py
+          uv pip install --python $corePython pytest
+          & $corePython -m pytest -q tests/test_process.py

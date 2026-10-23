@@ -267,10 +267,11 @@ portable pass/fail thresholds.
   implementation; a completed port MUST have zero stub skips.
 - The model-owned end-to-end adapters MUST identify the labels/evaluation index and evaluated splits so
   generic tests can compare requested and written prediction keys directly. `run_e2e` MUST also return the
-  exact `predict` arguments it used, and MUST apply `tests.signal.add_split_canaries` to its fixture and
+  external inputs and integer fixture seed in `E2EResult.inputs`, and MUST apply
+  `meds_model_core.conformance.signal.add_split_canaries` to its fixture and
   return the canaries. `fitted_codes` MUST report every code the model fitted a population statistic for,
   read from its artifacts.
-- `meds-model-add-to-meds-dev` (`meds_model_core.meds_dev.register`) installs `models/<profile>/model.yaml` and
+- `meds-model-add-to-meds-dev` (`meds_model_core.integrations.meds_dev.register`) installs `models/<profile>/model.yaml` and
   `requirements.txt`, with the repository as an editable requirement, into a MEDS-DEV checkout. A
   top-level `predicates.yaml` is copied as well when the repository has one. MEDS-DEV's own dataset
   predicates remain the default (section 2.3).
@@ -283,7 +284,7 @@ portable pass/fail thresholds.
   structured specifications/results/manifests rather than data, checkpoints, credentials, or raw logs,
   and leave results recoverable on disk if authentication or push fails.
 - `tests/test_meds_dev_e2e.py` and `tests/test_mimic_demo_e2e.py` MUST exercise the completed model through
-  MEDS-DEV and the MIMIC-IV demo respectively. Both explicitly skip while `STUB_PROFILES` is true. The MIMIC
+  MEDS-DEV and the MIMIC-IV demo respectively. Both skip only the profiles in `STUB_PROFILES`. The MIMIC
   test runs the full model profile on MEDS-DEV's `mortality/in_icu/first_24h` task and validates only standard
   boundaries; preprocessing payloads remain opaque.
 
@@ -292,11 +293,17 @@ portable pass/fail thresholds.
 The generated repository MUST test command discovery, selected-model-profile consistency, artifact compatibility,
 publication and rollback, predicate provenance, prediction key coverage/uniqueness, absence of label
 leakage and of transductive fitting (section 2.1), resource measurement presence, `models/<profile>/model.yaml`, SLURM
-dry-run, and its real end-to-end chain. The rendered `tests/test_end_to_end.py` does so in one real run:
+dry-run, and its real end-to-end chain. The rendered `tests/test_end_to_end.py` checks the original run and a fresh rerun:
 
-- **Label leakage:** `predict` is run again on a copy of the index whose evaluated splits have no label
-  column (every split for zero-shot profiles), and MUST still cover every key. Any read of an evaluated
-  split's labels fails. `attach_ground_truth` returns predictions unchanged on an unlabelled index.
+- **Label leakage:** the complete lifecycle runs again with evaluated outcome columns removed (all
+  outcomes for zero-shot profiles). Each external input root is copied separately, preserving permitted
+  train/tuning outcomes. Both runs MUST cover every key, and their probabilities MUST agree by key
+  (`rtol=1e-6`, `atol=1e-8`); optional Boolean decisions agree exactly. `run_e2e` MUST honor and record
+  the integer `seed` override, seed every RNG/framework/subprocess and use deterministic fixture settings.
+  `attach_ground_truth` returns predictions unchanged on an unlabelled index. This tests outcome
+  independence on the exercised fixture, not every possible code path.
+- **Prediction validity:** validate every Parquet shard in both runs, including unique/non-null keys and
+  finite probabilities in [0, 1]. No particular shard filename is required.
 - **Transductive fitting:** every tuning and held-out subject carries a canary code that occurs in no
   training subject. None of the canaries may appear in `fitted_codes`.
 - **Configuration:** every manifest carries a `config_digest`.
@@ -426,6 +433,8 @@ with the same key set can reuse it only when horizon and generation semantics al
 must be supplied and identified. In-context learners explicitly declare context selection and can read
 only train/tuning labels disjoint from evaluated splits. They do not publish or train a persistent
 task-specific model. Optional task criteria may be recorded as provenance.
+`read_context_labels(labels_dir, context_splits, evaluated_splits, evaluation_index_dir=...)`
+checks overlap against the supplied evaluation index; omitting it uses `labels_dir` for a combined layout.
 
 ### Additional compatibility requirements
 
@@ -484,6 +493,8 @@ batching ownership, missing-data semantics, save/load compatibility and exceptio
 Acceptance tests are parametrized over every declared profile. Removing one stub flag must not hide
 another profile's missing implementation. `run_e2e(tmp_path, *, profile, **inputs)` and
 `prepare_meds_dev_run(meds_dev, tmp_path, *, profile)` must honor profile selection and external overrides.
+Report validation checks shared sections and each completed profile even when another profile remains
+unfinished. Only unfinished profile sections and their profile-specific zero-shot sections may retain TODOs.
 
 Each completed profile needs full lifecycle, schema/key coverage, manifest/compatibility, temporal
 cutoff, train-only preprocessing, primary behavior and negative-control evidence. Probe tests must
@@ -493,7 +504,7 @@ payloads. Implement these model-specific assertions rather than relying only on 
 
 The shared `assert_profile_run` conformance helper reruns the full lifecycle through `run_e2e` with
 forbidden label columns removed. It requires fresh artifacts below a new run directory and preserves
-permitted training/context labels. Include `external_meds_dir` and all task inputs in `E2EResult.inputs`
+permitted training/context labels. Include `seed`, `external_meds_dir` and all task inputs in `E2EResult.inputs`
 so the check uses the same histories and task. This detects forbidden reads on the exercised path;
 it does not prove all possible code paths, temporal cutoffs, or absence of labels encoded in other
 features. Implement the corresponding model-specific checks as well.
