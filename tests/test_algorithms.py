@@ -137,6 +137,17 @@ def test_runner_publishes_resolved_config_and_request(prepared):
     assert "boolean_value" in pl.read_parquet(result.directory / "predictions.parquet").columns
 
 
+def test_absent_optional_predicates_field_in_recorded_config_means_none(prepared):
+    import yaml
+
+    runner, request = prepared
+    path = request.algorithm.directory / "manifest.yaml"
+    manifest = read_manifest(request.algorithm.directory)
+    del manifest["algorithm"]["config"]["additional_predicates_file"]
+    path.write_text(yaml.safe_dump(manifest))
+    runner.run(ToyAlgorithm(), "predict_supervised", request, profile="supervised")
+
+
 def test_reloaded_request_runs_in_a_fresh_process(prepared, tmp_path):
     runner, request = prepared
     original = runner.run(ToyAlgorithm(), "predict_supervised", request, profile="supervised")

@@ -8,7 +8,8 @@ from pathlib import Path
 from .algorithms import Algorithm, profile_class, request_type
 from .artifacts.manifest import digest_config, digest_file, measured_artifact
 from .artifacts.references import ArtifactDestination, PayloadMetadata, PredictionsArtifact
-from .requests import PredictionContext, PredictionIndex, StepRequest
+from .data.predicates import RESOLVED_PREDICATES_FILENAME, compose_feature_predicates
+from .requests import PredictionContext, PredictionIndex, PreprocessDataRequest, StepRequest
 from .tasks.spec import RelaxationLedger
 
 
@@ -50,6 +51,13 @@ class StepRunner:
             if field.name != "output"
             for path in _paths(getattr(request, field.name))
         ]
+        additional = (
+            algorithm.config.additional_predicates_file
+            if isinstance(request, PreprocessDataRequest)
+            else None
+        )
+        if additional is not None:
+            input_paths.append(additional)
         if evaluation_labels_dir is not None:
             if request.result_type is not PredictionsArtifact:
                 raise ValueError("Evaluation labels are allowed only after prediction")
@@ -61,6 +69,12 @@ class StepRunner:
             if destination == path or destination in path.parents or path in destination.parents:
                 raise ValueError("Output must not overlap any input path")
         inputs = {}
+        resolved_predicates = None
+        if additional is not None:
+            resolved_predicates, provenance = compose_feature_predicates(request.predicates_file, additional)
+            inputs["feature_predicates"] = provenance
+            if provenance["base"] is not None:
+                inputs["external_predicates_file"] = provenance["base"]
         for argument, artifact in request.artifact_inputs():
             artifact.read_manifest()
             inputs[argument] = {
@@ -83,7 +97,8 @@ class StepRunner:
             if task.predicates_file != request.predicates_file:
                 raise ValueError("Task predicates and request predicates must agree")
             inputs["task"] = task.provenance()
-        algorithm.validate_inputs(request)
+        if resolved_predicates is None:
+            algorithm.validate_inputs(request)
         metadata = None
         details = {
             "algorithm": {
@@ -108,15 +123,30 @@ class StepRunner:
             producer=f"{type(algorithm).__module__}.{type(algorithm).__qualname__}.{step}",
             payload_format=lambda: f"{metadata.format}/v{metadata.version}",
             inputs=inputs,
-            config_digest=digest_config({"config": algorithm.config.to_dict(), "request": request.to_dict()}),
+            config_digest=digest_config(
+                {
+                    "config": algorithm.config.to_dict(),
+                    "request": request.to_dict(),
+                    "feature_predicates": inputs.get("feature_predicates"),
+                }
+            ),
             semantics_digest=None if task is None else task.semantics_digest(),
-            external_predicates_file=request.predicates_file,
+            external_predicates_file=request.predicates_file if resolved_predicates is None else None,
             overwrite=request.execution.overwrite,
             repo=self.repo,
             manifest_fields=details,
         ) as staging:
             working = replace(request, output=ArtifactDestination(staging))
+            if resolved_predicates is not None:
+                effective_path = staging / RESOLVED_PREDICATES_FILENAME
+                effective_path.write_bytes(resolved_predicates)
+                working = replace(working, predicates_file=effective_path)
+                algorithm.validate_inputs(working)
             metadata = getattr(algorithm, step)(working)
+            if resolved_predicates is not None and (
+                not effective_path.is_file() or effective_path.read_bytes() != resolved_predicates
+            ):
+                raise ValueError("Algorithm modified the runner-owned resolved feature predicates")
             if algorithm.config.to_dict() != details["algorithm"]["config"]:
                 raise ValueError("Algorithm configuration changed during execution")
             if not isinstance(metadata, PayloadMetadata):

@@ -119,6 +119,12 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ## Changes
 
+### 0.4.0a2
+
+- Add optional `AlgorithmConfig.additional_predicates_file` for dataset-specific feature predicates.
+  Preprocessing composes it with the base, rejects duplicate names/keys, preserves the resolved file
+  and source digests, and keeps task predicates unchanged. Later steps do not reopen temporary sources.
+
 ### 0.4.0a1
 
 - Add profile ABCs, typed requests/artifact references and a shared runner that owns validation,

@@ -74,6 +74,26 @@ Any command that consumes the file MUST record its digest and origin.
 A algorithm that depends on particular predicate names declares and validates those requirements in its own
 configuration and tests. The contract does not prescribe a predicate-derived feature representation.
 
+`AlgorithmConfig.additional_predicates_file` MAY select additional feature predicates for the current
+dataset. It defaults to `None`; relative paths in `config_file` resolve against that file's parent.
+During `preprocess_data` only, the runner composes the optional base `external_predicates_file` and the
+additions. Both documents MUST contain only a `predicates` mapping of names to nonempty definitions.
+Duplicate YAML keys and names shared across the files MUST fail, even for identical definitions.
+The helper validates structure, not expression semantics or dataset compatibility.
+
+The preprocessing implementation and its `validate_inputs` hook receive the resolved file as
+`request.predicates_file`. Core owns this file, saves it as `resolved_feature_predicates.yaml` inside
+the prepared-data artifact, and records source paths/digests plus the resolved relative path/digest
+under `inputs.feature_predicates`. The configuration digest includes these identities. Implementations
+MUST NOT modify or delete the resolved file; the original request retains the external base path.
+When composing, the compatibility hook runs inside staging after resolution and is included in measurement.
+
+Feature additions MUST remain task-independent and respect temporal cutoffs. They MUST NOT redefine
+the target/cohort or supply outcomes to preprocessing. The runner never composes additions for training,
+prediction, or `TaskSpec`; task bindings and evaluated keys remain unchanged. Later stages consume
+persisted feature artifacts and do not reopen the additions file. Keep the same resolved configuration
+across the lifecycle. A preprocessing rerun still requires its original source files.
+
 ### 2.4 Task specification (zero-shot profiles)
 
 A supervised algorithm learns what to predict from labels. A zero-shot algorithm never sees labels, so the task

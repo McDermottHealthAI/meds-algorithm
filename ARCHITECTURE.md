@@ -74,6 +74,7 @@ result artifact class. There is no independent step-definition registry. `ALGORI
 classDiagram
     class AlgorithmConfig {
         <<frozen dataclass>>
+        additional_predicates_file
         validate()
         from_dict(values)
         from_file(path)
@@ -169,6 +170,12 @@ never imports code named by a file. Increment the algorithm's `schema_version` w
 changes; unsupported versions fail without guessing migrations. Requests use the same serialization.
 Constructed references use absolute paths; moving artifacts requires explicitly updating locations.
 
+`additional_predicates_file` is an optional keyword-only configuration field inherited by concrete
+configs. Preprocessing alone composes it with dataset predicates, rejects duplicate names/keys, and
+supplies a resolved `request.predicates_file` to the hook and method. The runner preserves that file
+inside prepared data with source/resolved digests; its contents are reserved. Later stages do not read
+the additions, and `TaskSpec` continues to use the original task binding. See contract section 2.3.
+
 ## Shared execution
 
 `AlgorithmRepository` associates profile names with implementation classes, creates a fresh instance
@@ -183,9 +190,13 @@ sequenceDiagram
     participant Publish as measured_artifact
     Caller->>Runner: run(algorithm, step, request, profile)
     Runner->>Runner: Validate types, paths, manifests, index and context
-    Runner->>Algorithm: validate_inputs(request)
+    Runner->>Algorithm: validate_inputs(request) when no feature composition is needed
     Runner->>Publish: Lock destination, create staging, start measurements
     Publish-->>Runner: Staging directory
+    opt Preprocessing with additional predicates
+        Runner->>Runner: Save resolved feature predicates from validated source snapshots
+        Runner->>Algorithm: validate_inputs(request with resolved predicates)
+    end
     Runner->>Algorithm: step(request with staging destination)
     Algorithm-->>Runner: PayloadMetadata(format, version)
     Runner->>Runner: Validate prediction keys/probabilities and zero-shot ledger

@@ -1,6 +1,6 @@
 """Algorithm-owned configuration types and shared per-invocation execution options."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -11,6 +11,8 @@ from .serialization import Serializable
 @dataclass(frozen=True)
 class AlgorithmConfig(Serializable):
     """Extend in a algorithm repository with typed fields, defaults and validate()."""
+
+    additional_predicates_file: Path | None = field(default=None, kw_only=True)
 
     @classmethod
     def from_file(cls, path: Path | str):
