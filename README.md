@@ -7,6 +7,9 @@ and training targets, validates prediction outputs, and provides reusable confor
 Model repositories import these utilities so fixes can be distributed through a package update.
 Model architectures, tokenizers, training objectives and task-specific logic stay in the model repository.
 
+See the [architecture and UML diagrams](ARCHITECTURE.md) for the current class structure, command
+execution, package dependencies, and the tradeoffs around an `Algorithm` superclass and step interfaces.
+
 ## Package layout
 
 ```text
