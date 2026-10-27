@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from ..contracts.commands import MODEL_PROFILES, STEP_SPECS, CommandName
+from ..contracts.commands import ALGORITHM_PROFILES, STEP_SPECS, CommandName
 from ..runtime.provenance import code_provenance
 from .manifest import digest_file, read_manifest
 
@@ -27,7 +27,7 @@ def write_run_result(
     status: str = "complete",
 ) -> Path:
     """Write `spec.yaml`, copied manifests, and a run-level `result.yaml`."""
-    if profile not in MODEL_PROFILES or set(artifacts) - set(MODEL_PROFILES[profile]):
+    if profile not in ALGORITHM_PROFILES or set(artifacts) - set(ALGORITHM_PROFILES[profile]):
         raise ValueError("Run artifacts must belong to a declared contract profile")
     run_dir = Path(run_dir)
     repo = Path(repo).resolve()

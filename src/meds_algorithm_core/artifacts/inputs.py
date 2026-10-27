@@ -26,7 +26,7 @@ def resolve_input(artifact: Path, argument: str) -> Path:
     upstream = read_manifest(path)
     if upstream["artifact"]["type"] != expected.artifact_type.value:
         raise ValueError(f"{argument} has the wrong artifact type")
-    # Content, vocabulary, and model-specific compatibility are still checked by the consumer.
+    # Content, vocabulary, and algorithm-specific compatibility are still checked by the consumer.
     return path
 
 

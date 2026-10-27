@@ -12,7 +12,7 @@ from ..artifacts.publication import staged_directory
 
 def register(repo: Path, meds_dev: Path, name: str, profile: str | None = None) -> Path:
     source = repo.resolve()
-    descriptors = {p.parent.name: p for p in (source / "models").glob("*/model.yaml")}
+    descriptors = {p.parent.name: p for p in (source / "algorithms").glob("*/model.yaml")}
     if profile is None:
         if len(descriptors) != 1:
             raise ValueError("Select --profile when the repository has several descriptors")

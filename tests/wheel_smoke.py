@@ -6,12 +6,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-from meds_model_core import measured_artifact, read_manifest
-from meds_model_core.spec import specification
+from meds_algorithm_core import measured_artifact, read_manifest
+from meds_algorithm_core.spec import architecture, specification
 
 assert importlib.util.find_spec("polars") is None
 assert importlib.util.find_spec("pytest") is None
-assert specification().splitlines()[0] == "# MEDS Model Repository Contract, version 3"
+assert specification().splitlines()[0] == "# MEDS Algorithm Repository Contract, version 4"
+assert "classDiagram" in architecture() and "StepRunner" in architecture()
 with tempfile.TemporaryDirectory() as directory:
     artifact = Path(directory) / "artifact"
     with measured_artifact(
@@ -25,7 +26,7 @@ with tempfile.TemporaryDirectory() as directory:
     manifest = read_manifest(artifact)
     assert manifest["code"]["git_commit"] is None and manifest["code"]["dirty"] is None
     assert (artifact / "payload").read_text() == "ok"
-for name in ("meds-model-core-spec", "meds-model-resolve-input", "meds-model-add-to-meds-dev"):
+for name in ("meds-algorithm-core-spec", "meds-algorithm-resolve-input", "meds-algorithm-add-to-meds-dev"):
     executable = Path(sys.executable).parent / (name + (".exe" if sys.platform == "win32" else ""))
     subprocess.run([str(executable), "--help"], check=True, capture_output=True)
 print(

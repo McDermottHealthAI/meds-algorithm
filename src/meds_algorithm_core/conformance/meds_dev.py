@@ -36,7 +36,7 @@ def assert_meds_dev_predicates_capability(checkout: Path) -> None:
         or 'format_kwargs["predicates_path"]' not in implementation.read_text()
     ):
         raise AssertionError(
-            "MEDS-DEV lacks the predicates_path model-command passthrough. Use MEDS_DEV_REF="
+            "MEDS-DEV lacks the predicates_path algorithm-command passthrough. Use MEDS_DEV_REF="
             f"{MEDS_DEV_PINNED_REF} or a revision containing MEDS-DEV PR #325."
         )
 
@@ -46,7 +46,7 @@ def assert_meds_dev_task_criteria_capability(checkout: Path) -> None:
     implementation = checkout / "src" / "MEDS_DEV" / "models" / "__init__.py"
     if 'format_kwargs["task_criteria_path"]' not in implementation.read_text():
         raise AssertionError(
-            "MEDS-DEV lacks the task_criteria_path model-command passthrough that zero-shot model.yaml "
+            "MEDS-DEV lacks the task_criteria_path algorithm-command passthrough that zero-shot model.yaml "
             f"commands use. Use MEDS_DEV_REF={MEDS_DEV_PINNED_REF} or a revision containing MEDS-DEV PR #330."
         )
 
@@ -123,5 +123,5 @@ def prepare_mimic_demo(meds_dev, tmp_path):
 
 
 def mimic_task_criteria(meds_dev) -> Path:
-    """MEDS-DEV's own ACES criteria for the demo task: what a zero-shot model is asked to predict."""
+    """MEDS-DEV's own ACES criteria for the demo task: what a zero-shot algorithm is asked to predict."""
     return meds_dev / "src" / "MEDS_DEV" / "tasks" / "mortality" / "in_icu" / "first_24h.yaml"

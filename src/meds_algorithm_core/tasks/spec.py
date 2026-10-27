@@ -1,12 +1,12 @@
 """The zero-shot task boundary: task specification, label-blind index, and relaxation ledger.
 
-A supervised model learns *what* to predict from labels. A zero-shot model is never shown labels, so the
-task definition itself must cross the contract boundary. The overall task language is ACES: a task is an
-ACES criteria file plus, optionally, a dataset predicates file.
+A supervised algorithm learns *what* to predict from labels. A zero-shot algorithm is never shown labels,
+so the task definition itself must cross the contract boundary. The task language is ACES: a criteria
+file plus, optionally, a dataset predicates file.
 
 The contract fixes only the inputs (task, index, MEDS data), the final predictions, the semantics digest
 that ties every artifact to the exact task it answers, and a minimal ledger of how the answered task
-differs from the requested one. How a model turns the task into predictions is its own; the
+differs from the requested one. How a algorithm turns the task into predictions is its own; the
 implementation guide recommends an encode -> infer -> decode shape.
 """
 
@@ -52,7 +52,7 @@ class TaskSpec:
         if not criteria:
             raise ValueError(
                 "zero-shot commands require external_task_criteria_file=<ACES task YAML>; without it the "
-                "model cannot know what to predict"
+                "algorithm cannot know what to predict"
             )
         return cls(
             criteria_file=criteria,
@@ -92,7 +92,7 @@ class RelaxationLedger:
     Only ``query_language``, ``decoded_quantity``, and ``exact`` are required. ``steps`` is free-form: one
     mapping per rewrite or assumption between the requested and the answered task. The implementation
     guide recommends ``name``, ``kind``, ``direction``, and ``detail`` keys; the contract does not validate
-    them. An exact model writes ``exact: true`` and no steps.
+    them. An exact algorithm writes ``exact: true`` and no steps.
     """
 
     query_language: str

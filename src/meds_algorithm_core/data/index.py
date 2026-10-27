@@ -42,7 +42,7 @@ def split_files(root: Path | str, splits: Sequence[str] | None = None) -> list[P
 
 
 def read_index(root: Path | str, splits: Sequence[str] | None = None):
-    """Project keys at the Parquet read, never loading label columns into the model boundary."""
+    """Project keys at the Parquet read, never loading label columns into the algorithm boundary."""
     import polars as pl
 
     frames = []

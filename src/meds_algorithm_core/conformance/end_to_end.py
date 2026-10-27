@@ -1,10 +1,10 @@
-"""Reusable end-to-end conformance; execution and fitted-feature inspection are model-owned."""
+"""Reusable end-to-end conformance; execution and fitted-feature inspection are algorithm-owned."""
 
 from contextlib import suppress
 from pathlib import Path
 
-from meds_model_core import (
-    MODEL_PROFILES,
+from meds_algorithm_core import (
+    ALGORITHM_PROFILES,
     STEP_SPECS,
     ZERO_SHOT_TASK_COMMANDS,
     CommandName,
@@ -20,7 +20,7 @@ def _strip_labels(labels_dir: Path, destination: Path, splits) -> Path:
     """Remove outcomes from selected splits while retaining permitted training/context outcomes."""
     import polars as pl
 
-    from meds_model_core import split_files
+    from meds_algorithm_core import split_files
 
     labels_dir = Path(labels_dir)
     files = split_files(labels_dir)
@@ -42,7 +42,7 @@ def _strip_labels(labels_dir: Path, destination: Path, splits) -> Path:
 def assert_profile_run(result, *, profile, run_e2e, fitted_codes, tmp_path):
     """Check actual artifacts, task binding, key coverage, prediction reads and split canaries."""
     artifacts = result.artifacts
-    assert list(artifacts) == [command.value for command in MODEL_PROFILES[profile]]
+    assert list(artifacts) == [command.value for command in ALGORITHM_PROFILES[profile]]
     for command, directory in artifacts.items():
         manifest = read_manifest(directory)
         assert manifest["command"]["name"] == command
@@ -57,7 +57,7 @@ def assert_profile_run(result, *, profile, run_e2e, fitted_codes, tmp_path):
             assert memory["peak_process_tree_rss_bytes"] is None
         else:
             assert memory["peak_process_tree_rss_bytes"] > 0
-    prediction_step = MODEL_PROFILES[profile][-1].value
+    prediction_step = ALGORITHM_PROFILES[profile][-1].value
     read_predictions(artifacts[prediction_step])
     prediction_manifest = read_manifest(artifacts[prediction_step])
     assert prediction_manifest["artifact"]["type"] == "predictions"
@@ -66,7 +66,7 @@ def assert_profile_run(result, *, profile, run_e2e, fitted_codes, tmp_path):
     assert_label_blind_pipeline(result, profile=profile, run_e2e=run_e2e, tmp_path=tmp_path)
 
     # Absence of transductive fitting (SPEC 2.1): codes that occur only in tuning or held-out subjects must
-    # not be part of anything the model fitted.
+    # not be part of anything the algorithm fitted.
     assert set(result.canaries) == {"tuning", "held_out"}, (
         "run_e2e must apply core conformance.signal.add_split_canaries and return the canaries"
     )
@@ -93,7 +93,7 @@ def assert_label_blind_pipeline(result, *, profile, run_e2e, tmp_path):
     """Rerun every stage on the same histories with forbidden outcomes absent and fresh artifacts."""
     assert result.inputs.get("external_meds_dir"), "E2EResult.inputs must record external_meds_dir"
     assert type(result.inputs.get("seed")) is int, "E2EResult.inputs must record the run_e2e seed"
-    expected_steps = [step.value for step in MODEL_PROFILES[profile]]
+    expected_steps = [step.value for step in ALGORITHM_PROFILES[profile]]
     original = read_predictions(result.artifacts[expected_steps[-1]])
     overrides = dict(result.inputs)
     for argument in ("external_labels_dir", "external_index_dir", "external_evaluation_labels_dir"):

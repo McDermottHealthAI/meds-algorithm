@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from meds_model_core import measured_artifact, read_manifest, write_run_result
-from meds_model_core.artifacts.inputs import resolve_input
-from meds_model_core.artifacts.publication import staged_directory
-from meds_model_core.runtime.provenance import code_provenance
-from meds_model_core.runtime.resources import _ProcessTreeMemorySampler
+from meds_algorithm_core import measured_artifact, read_manifest, write_run_result
+from meds_algorithm_core.artifacts.inputs import resolve_input
+from meds_algorithm_core.artifacts.publication import staged_directory
+from meds_algorithm_core.runtime.provenance import code_provenance
+from meds_algorithm_core.runtime.resources import _ProcessTreeMemorySampler
 
 
 def publish(path, **kwargs):
@@ -19,7 +19,7 @@ def publish(path, **kwargs):
         path,
         artifact_type="patients",
         command="preprocess_data",
-        producer="test.model",
+        producer="test.algorithm",
         payload_format="test/v1",
         **kwargs,
     )
@@ -30,10 +30,10 @@ def test_body_failure_and_existing_destination_preserve_previous_artifact(tmp_pa
     with publish(target) as staging:
         (staging / "payload").write_text("old")
     with pytest.raises(FileExistsError), publish(target):
-        pytest.fail("existing artifact must be rejected before model work")
-    with pytest.raises(RuntimeError, match="model failed"), publish(target, overwrite=True) as staging:
+        pytest.fail("existing artifact must be rejected before algorithm work")
+    with pytest.raises(RuntimeError, match="algorithm failed"), publish(target, overwrite=True) as staging:
         (staging / "payload").write_text("new")
-        raise RuntimeError("model failed")
+        raise RuntimeError("algorithm failed")
     assert (target / "payload").read_text() == "old"
     assert not list(tmp_path.glob(".*.staging-*"))
     assert not list(tmp_path.glob("*.lock"))
@@ -80,13 +80,13 @@ def test_manifest_write_failure_keeps_previous_artifact(tmp_path, monkeypatch):
     assert (target / "old").is_file()
 
 
-def test_model_provenance_is_explicit_and_unknown_outside_checkout(tmp_path, monkeypatch):
-    model = tmp_path / "model"
-    model.mkdir()
+def test_algorithm_provenance_is_explicit_and_unknown_outside_checkout(tmp_path, monkeypatch):
+    algorithm = tmp_path / "algorithm"
+    algorithm.mkdir()
 
     def git(*args):
         return subprocess.run(
-            ["git", "-C", str(model), *args], check=True, capture_output=True, text=True
+            ["git", "-C", str(algorithm), *args], check=True, capture_output=True, text=True
         ).stdout.strip()
 
     git("init")
@@ -98,17 +98,17 @@ def test_model_provenance_is_explicit_and_unknown_outside_checkout(tmp_path, mon
         "commit",
         "--allow-empty",
         "-m",
-        "model",
+        "algorithm",
     )
     monkeypatch.chdir(tmp_path)
-    with publish(tmp_path / "artifact", repo=model):
+    with publish(tmp_path / "artifact", repo=algorithm):
         pass
     code = read_manifest(tmp_path / "artifact")["code"]
     assert code["git_commit"] == git("rev-parse", "HEAD") and code["dirty"] is False
-    (model / "changed").touch()
-    assert code_provenance(model)["dirty"] is True
+    (algorithm / "changed").touch()
+    assert code_provenance(algorithm)["dirty"] is True
     assert code_provenance(None)["git_commit"] is None
-    assert code_provenance(model / "unpacked-wheel")["dirty"] is None
+    assert code_provenance(algorithm / "unpacked-wheel")["dirty"] is None
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux /proc behavior")
@@ -138,7 +138,7 @@ def test_process_tree_includes_worker_thread_children():
 
 
 def test_unavailable_resource_measurement_is_reported_honestly(monkeypatch):
-    from meds_model_core.runtime import resources
+    from meds_algorithm_core.runtime import resources
 
     monkeypatch.setattr(resources, "resource", None)
     sampler = _ProcessTreeMemorySampler()
@@ -153,17 +153,17 @@ def test_upstream_resolution_and_result_identity(tmp_path):
     data = tmp_path / "data"
     with publish(data):
         pass
-    model = tmp_path / "model"
+    algorithm = tmp_path / "algorithm"
     with measured_artifact(
-        model,
-        artifact_type="supervised_model",
+        algorithm,
+        artifact_type="supervised_algorithm",
         command="train_supervised",
         producer="test",
         payload_format="test/v1",
         inputs={"input_data_dir": {"path": "../data"}},
     ):
         pass
-    assert resolve_input(model, "input_data_dir") == data
+    assert resolve_input(algorithm, "input_data_dir") == data
     with pytest.raises(ValueError, match="disagrees"):
         write_run_result(
             tmp_path / "run",
@@ -195,4 +195,4 @@ def test_invalid_manifest_and_publication_type_fail_before_use(tmp_path):
             payload_format="test/v1",
         ),
     ):
-        pytest.fail("must reject type before model work")
+        pytest.fail("must reject type before algorithm work")

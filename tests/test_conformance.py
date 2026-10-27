@@ -4,8 +4,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from meds_model_core import (
-    MODEL_PROFILES,
+from meds_algorithm_core import (
+    ALGORITHM_PROFILES,
     STEP_SPECS,
     RelaxationLedger,
     TaskSpec,
@@ -14,8 +14,8 @@ from meds_model_core import (
     measured_artifact,
     read_index,
 )
-from meds_model_core.conformance.end_to_end import assert_label_blind_pipeline, assert_profile_run
-from meds_model_core.conformance.types import E2EResult
+from meds_algorithm_core.conformance.end_to_end import assert_label_blind_pipeline, assert_profile_run
+from meds_algorithm_core.conformance.types import E2EResult
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def pipeline(tmp_path):
         splits = inputs.get("splits", ["held_out"])
         task = TaskSpec(criteria)
         artifacts = {}
-        for step in MODEL_PROFILES[profile]:
+        for step in ALGORITHM_PROFILES[profile]:
             spec = STEP_SPECS[step]
             dest = Path(path) / step.value
             with measured_artifact(
@@ -56,7 +56,7 @@ def pipeline(tmp_path):
                 inputs={"task": task.provenance()} if spec.task_conditioned else None,
                 semantics_digest=task.semantics_digest() if spec.task_conditioned else None,
             ) as staging:
-                if step == MODEL_PROFILES[profile][-1]:
+                if step == ALGORITHM_PROFILES[profile][-1]:
                     predicted = read_index(index_dir, splits).with_columns(
                         pl.lit(0.5).alias("predicted_boolean_probability")
                     )
@@ -117,7 +117,7 @@ def test_original_invalid_scores_fail_before_rerun(tmp_path, pipeline, probabili
 def test_sharded_predictions_and_separate_training_roots(tmp_path, pipeline):
     import shutil
 
-    from meds_model_core.data.labels import read_targets
+    from meds_algorithm_core.data.labels import read_targets
 
     initial = pipeline(tmp_path / "setup", profile="supervised")
     training, index = tmp_path / "training", tmp_path / "index"
@@ -152,7 +152,7 @@ def test_reproducible_seed_is_required(tmp_path, pipeline):
         check(result, pipeline, tmp_path / "checks")
 
 
-@pytest.mark.parametrize("profile", list(MODEL_PROFILES))
+@pytest.mark.parametrize("profile", list(ALGORITHM_PROFILES))
 def test_shared_conformance_runs_each_profile_from_fresh_outputs(tmp_path, pipeline, profile):
     result = pipeline(tmp_path / "original", profile=profile)
     assert_profile_run(

@@ -1,4 +1,4 @@
-"""Record the caller's model checkout; never infer it from the core package or cwd."""
+"""Record the caller's algorithm checkout; never infer it from the core package or cwd."""
 
 import subprocess
 from pathlib import Path

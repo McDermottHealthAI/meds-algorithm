@@ -1,4 +1,4 @@
-"""Small example MEDS cohort for a model-owned primary-behavior test."""
+"""Small example MEDS cohort for a algorithm-owned primary-behavior test."""
 
 from __future__ import annotations
 
@@ -27,12 +27,12 @@ def build_signal_dataset(
     """Write a tiny MEDS dataset where ``signal_code`` alone determines the binary label.
 
     Positive and negative subjects have equal-length histories. The signal position and history length
-    are randomized independently of the label, so a model must represent the code rather than exploit a
+    are randomized independently of the label, so a algorithm must represent the code rather than exploit a
     length or position leak. Shuffling labels supplies the paired negative control.
 
-    This is an example fixture, not an input representation imposed on the model. Adapt or replace it
+    This is an example fixture, not an input representation imposed on the algorithm. Adapt or replace it
     when the implementation needs codes from a fixed vocabulary, predicates, numeric values, or another
-    model-specific binding.
+    algorithm-specific binding.
     """
     root = Path(root)
     rng = random.Random(seed)
@@ -115,7 +115,7 @@ def add_split_canaries(root: Path) -> dict[str, str]:
     """Give every tuning and held-out subject one event with a code that occurs in no other split.
 
     Statistics fitted on the training split alone (vocabularies, code frequencies, bins) can never contain
-    these codes; a model that fits over every split will. The codes are not added to
+    these codes; a algorithm that fits over every split will. The codes are not added to
     ``metadata/codes.parquet``, so a vocabulary read from metadata does not pick them up either. Each canary
     is placed at the subject's first event time, so it falls in history before any prediction time.
     Returns the canary code of each split.

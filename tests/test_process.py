@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from meds_model_core.runtime.process import run
+from meds_algorithm_core.runtime.process import run
 
 
 def test_run_preserves_output_and_failure():

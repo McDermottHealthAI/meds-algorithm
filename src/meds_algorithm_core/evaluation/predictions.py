@@ -44,7 +44,7 @@ def attach_ground_truth(
     """Join truth only after scores are fixed; an entirely unlabelled index is supported.
 
     This function cannot enforce when the caller scores. Its result must never feed back into
-    preprocessing, model fitting, selection or scoring. Missing splits/mixed label schemas fail.
+    preprocessing, algorithm fitting, selection or scoring. Missing splits/mixed label schemas fail.
     """
     validate_keys(predictions, source="predictions")
     labels = read_targets(labels_dir, splits, allow_unlabelled=True)
