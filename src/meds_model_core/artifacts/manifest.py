@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -64,18 +64,26 @@ def measured_artifact(
     artifact_type: str,
     command: str,
     producer: str,
-    payload_format: str,
+    payload_format: str | Callable[[], str],
     inputs: dict[str, Any] | None = None,
     config_digest: str | None = None,
     semantics_digest: str | None = None,
     external_predicates_file: Path | str | None = None,
     overwrite: bool = False,
     repo: Path | str | None = None,
+    manifest_fields: dict[str, Any] | None = None,
 ) -> Iterator[Path]:
     """Measure staged output and publish its manifest with rollback on replacement failure."""
     if STEP_SPECS[CommandName(command)].artifact_type.value != artifact_type:
         raise ValueError("Artifact type does not match its command")
-    if not all(isinstance(value, str) and value.strip() for value in (producer, payload_format)):
+    if (
+        not isinstance(producer, str)
+        or not producer.strip()
+        or (
+            not callable(payload_format)
+            and (not isinstance(payload_format, str) or not payload_format.strip())
+        )
+    ):
         raise ValueError("producer and payload_format must be nonempty strings")
     with staged_directory(destination, overwrite=overwrite) as staging:
         started = time.monotonic()
@@ -85,6 +93,9 @@ def measured_artifact(
             yield staging
         finally:
             sampler.stop()
+        resolved_format = payload_format() if callable(payload_format) else payload_format
+        if not isinstance(resolved_format, str) or not resolved_format.strip():
+            raise ValueError("payload_format must resolve to a nonempty string")
         predicates = None
         if external_predicates_file is not None:
             predicates = {
@@ -98,7 +109,7 @@ def measured_artifact(
             "contract_version": CONTRACT_VERSION,
             "artifact": {
                 "type": artifact_type,
-                "payload_format": payload_format,
+                "payload_format": resolved_format,
                 "producer": producer,
             },
             "command": {"name": command, "config_digest": config_digest},
@@ -124,4 +135,8 @@ def measured_artifact(
                 },
             },
         }
+        if manifest_fields:
+            if manifest.keys() & manifest_fields.keys():
+                raise ValueError("Extra manifest fields cannot replace the common envelope")
+            manifest.update(manifest_fields)
         (staging / "manifest.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))

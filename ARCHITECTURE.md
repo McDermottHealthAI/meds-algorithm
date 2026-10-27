@@ -1,186 +1,236 @@
-# Architecture
+# Architecture and typed algorithm API
 
-`meds-model-core` supplies command boundaries and shared infrastructure. A model repository supplies
-the implementations and selects its profiles. This page describes the implemented API; the final
-section discusses possible extensions. [CONTRACT.md](src/meds_model_core/CONTRACT.md) remains the
-normative specification.
+Core owns profile interfaces, typed requests, artifact references, serialization and execution.
+Model repositories own concrete algorithms, configurations, payloads and scientific compatibility.
+The [contract](src/meds_model_core/CONTRACT.md) remains normative. These diagrams describe implemented
+classes. This source is also packaged in the wheel and rendered by the template documentation.
 
-## Current command classes
+## Profile hierarchy
 
-These classes are implemented in [contracts/commands.py](src/meds_model_core/contracts/commands.py).
-The UML omits enum members and shortens Python type expressions for readability. Dashed arrows denote
-dependencies; the open diamond denotes a reference to registered classes, not ownership of a fitted model.
+Every profile requires preprocessing; only pretrained profiles require pretraining. A family can
+inherit several profile ABCs when shared methods have the same semantics, or register separate
+implementation classes that share internal components.
 
 ```mermaid
 classDiagram
-    class ModelRepository {
-        +tuple profiles
-        +dict commands
-        +select_profile(profile) str
-        +profile_commands(profile) tuple
-        +run(name, arguments, profile) Path
-    }
-    class Command {
+    class Algorithm {
         <<abstract>>
-        +CommandName name
-        +run(arguments) Path*
-        +#95;#95;call#95;#95;(arguments) Path
+        name
+        config_type
+        config
+        preprocess_data(request)*
+        validate_inputs(request)
     }
-    class StepSpec {
-        <<frozen dataclass>>
-        +ArtifactType artifact_type
-        +str output_argument
-        +tuple artifact_inputs
-        +tuple external_arguments
-        +bool requires_splits
-        +str label_access
-        +bool task_conditioned
-        +validate(arguments) None
+    class SupervisedAlgorithm {
+        <<abstract>>
+        train_supervised(request)*
+        predict_supervised(request)*
     }
-    class ArtifactInput {
-        <<frozen dataclass>>
-        +str argument
-        +ArtifactType artifact_type
+    class PretrainedAlgorithm {
+        <<abstract>>
+        pretrain(request)*
     }
-    class CommandName {
-        <<enumeration>>
+    class FinetuneAlgorithm {
+        <<abstract>>
+        train_finetune(request)*
+        predict_finetune(request)*
     }
-    class ArtifactType {
-        <<enumeration>>
+    class ProbeAlgorithm {
+        <<abstract>>
+        infer_embeddings(request)*
+        train_probe(request)*
+        predict_probe(request)*
     }
-    ModelRepository o-- Command : registers subclasses
-    ModelRepository ..> CommandName : selects a command
-    Command --> CommandName : name
-    Command ..> StepSpec : validates via STEP_SPECS
-    StepSpec "0..*" --> "0..*" ArtifactInput : required upstream artifacts
-    StepSpec --> ArtifactType : output type
-    ArtifactInput --> ArtifactType : input type
+    class ZeroShotDirectAlgorithm {
+        <<abstract>>
+        predict_zero_shot_direct(request)*
+    }
+    class ZeroShotMaterializedAlgorithm {
+        <<abstract>>
+        infer_trajectories(request)*
+        predict_zero_shot_materialized(request)*
+    }
+    class PredictOnlyAlgorithm {
+        <<abstract>>
+        predict_only(request)*
+    }
+    Algorithm <|-- SupervisedAlgorithm
+    Algorithm <|-- PretrainedAlgorithm
+    Algorithm <|-- PredictOnlyAlgorithm
+    PretrainedAlgorithm <|-- FinetuneAlgorithm
+    PretrainedAlgorithm <|-- ProbeAlgorithm
+    PretrainedAlgorithm <|-- ZeroShotDirectAlgorithm
+    PretrainedAlgorithm <|-- ZeroShotMaterializedAlgorithm
 ```
 
-Two module-level dictionaries connect these classes:
+Each profile class declares its `profile` and ordered `steps`; method annotations identify request
+types. Request fields define CLI arguments, while each request declares its output argument and
+result artifact class. There is no independent step-definition registry. `MODEL_PROFILES` and
+`STEP_SPECS` are read-only, derived compatibility views for existing consumers.
 
-- `MODEL_PROFILES` maps a profile name to its ordered command names. `ModelRepository` requires the
-  registered classes to cover exactly the union of the selected profiles.
-- `STEP_SPECS` maps each command name to its `StepSpec`: required path arguments, input/output artifact
-  types, split requirements, label-access policy and whether it receives task criteria.
+## Requests, configuration and artifacts
 
-There is **one abstract command interface**, `Command.run(arguments: Mapping[str, Any]) -> Path`.
-`PreprocessData`, `TrainSupervised`, `PredictSupervised` and the other named step classes are generated
-in model repositories; they are not separate abstract classes exported by core. The template initially
-derives them from a model-local `StubCommand`, whose `run` raises `NotImplementedError`.
+```mermaid
+classDiagram
+    class ModelConfig {
+        <<frozen dataclass>>
+        validate()
+        from_dict(values)
+        from_file(path)
+        save(path)
+        load(path)
+    }
+    class ModelOwnedConfig {
+        <<frozen dataclass>>
+        model parameters and defaults
+    }
+    class StepRequest {
+        <<frozen dataclass>>
+        output
+        execution
+        predicates_file
+        from_arguments(arguments)
+        save(path)
+        load(path)
+    }
+    class PredictSupervisedRequest {
+        data
+        model
+        index
+    }
+    class ArtifactReference {
+        <<frozen dataclass>>
+        directory
+        kind
+        open(directory)
+        read_manifest()
+    }
+    class PreparedDataArtifact
+    class SupervisedModelArtifact
+    class PredictionsArtifact
+    class PredictionIndex {
+        directory
+        splits
+        read()
+    }
+    class ArtifactDestination {
+        directory
+    }
+    class ExecutionOptions {
+        seed
+        overwrite
+    }
+    ModelConfig <|-- ModelOwnedConfig
+    StepRequest <|-- PredictSupervisedRequest
+    ArtifactReference <|-- PreparedDataArtifact
+    ArtifactReference <|-- SupervisedModelArtifact
+    ArtifactReference <|-- PredictionsArtifact
+    PredictSupervisedRequest --> PreparedDataArtifact : data
+    PredictSupervisedRequest --> SupervisedModelArtifact : model
+    PredictSupervisedRequest --> PredictionIndex : index
+    StepRequest --> ArtifactDestination : output
+    StepRequest --> ExecutionOptions : execution
+```
 
-`StepSpec.validate` checks argument shapes and rejects certain forbidden arguments. It does not open
-and validate every upstream artifact, enforce which files model code reads, or validate predictions.
-Implementations must invoke the appropriate core helpers and perform model-specific compatibility
-checks. Conformance tests provide additional evidence; Python inheritance does not enforce scientific
-correctness or data isolation.
+Artifact constructors normalize paths without loading payloads. `open`/`read_manifest` validate the
+common envelope and artifact type. The runner validates references before model code. Payload readers
+remain model-owned; core imposes no tensor, tokenizer, batching or dataframe representation.
 
-## How a command executes
+`TrainingLabels.read` accepts only train/tuning. `PredictionIndex.read` projects keys at the I/O boundary.
+`PredictionContext` explicitly selects train/tuning and checks overlap with evaluated keys. Zero-shot
+requests carry `TaskSpec`. These interfaces make permissions clear; they are not a filesystem sandbox.
+
+Define configuration in the model repository:
+
+```python
+from dataclasses import dataclass
+from meds_model_core import ModelConfig
+
+
+@dataclass(frozen=True)
+class Config(ModelConfig):
+    C: float = 1.0
+    max_iterations: int = 1000
+
+    def validate(self):
+        if self.C <= 0 or self.max_iterations < 1:
+            raise ValueError("C and max_iterations must be positive")
+```
+
+Core validates field types, rejects unknown keys and nonfinite floats, and resolves defaults. Supported
+values are strings, booleans, integers, finite floats, paths, enums, tuples, optional values and nested
+frozen dataclasses. Mutable configuration fields and arbitrary Python objects are unsupported. JSON
+arrays can initialize typed tuples. Override `validate`, not `__post_init__`, for model constraints.
+
+Use `config_file=/path/config.yaml` on the CLI for a JSON/YAML values mapping. Relative paths in that
+file resolve against its parent. `Config.save` writes a versioned JSON envelope with an explicit class
+identifier and all resolved values. `Config.load` checks the requested class and schema version; it
+never imports code named by a file. Increment the model's `schema_version` when serialized meaning
+changes; unsupported versions fail without guessing migrations. Requests use the same serialization.
+Constructed references use absolute paths; moving artifacts requires explicitly updating locations.
+
+## Shared execution
+
+`AlgorithmRepository` associates profile names with implementation classes, creates a fresh instance
+for every dispatch, converts CLI arguments into a request, and delegates to `StepRunner.run`. Python
+callers can invoke the runner directly.
 
 ```mermaid
 sequenceDiagram
-    participant Caller as Model CLI or adapter
-    participant Repository as ModelRepository
-    participant Step as Model-owned Command subclass
-    participant Spec as StepSpec
-    participant Artifact as measured_artifact
-    Caller->>Repository: run(name, arguments, profile)
-    Repository->>Repository: Select profile and check command membership
-    Repository->>Step: Instantiate registered class
-    Repository->>Step: __call__(arguments)
-    Step->>Spec: validate(arguments)
-    Spec-->>Step: Valid arguments, or raise
-    Step->>Step: run(arguments): validate inputs and execute model logic
-    Note over Step,Artifact: Model code explicitly uses publication helpers;
-    Note over Step,Artifact: dispatch does not wrap run automatically.
-    Step->>Artifact: Enter measured_artifact(..., repo=model_root)
-    Artifact-->>Step: Staging directory
-    Step->>Step: Write model-owned payload
-    Step->>Artifact: Exit context successfully
-    Artifact->>Artifact: Record manifest and publish staged output
-    Step-->>Repository: Published artifact Path
-    Repository-->>Caller: Path
+    participant Caller as CLI or Python caller
+    participant Runner as StepRunner
+    participant Model as Algorithm implementation
+    participant Publish as measured_artifact
+    Caller->>Runner: run(algorithm, step, request, profile)
+    Runner->>Runner: Validate types, paths, manifests, index and context
+    Runner->>Model: validate_inputs(request)
+    Runner->>Publish: Lock destination, create staging, start measurements
+    Publish-->>Runner: Staging directory
+    Runner->>Model: step(request with staging destination)
+    Model-->>Runner: PayloadMetadata(format, version)
+    Runner->>Runner: Validate prediction keys/probabilities and zero-shot ledger
+    Runner->>Runner: Attach optional evaluation truth after scoring
+    Runner->>Runner: Save config.json and original request.json
+    Runner->>Publish: Successful context exit
+    Publish->>Publish: Write manifest and publish with rollback
+    Runner-->>Caller: Typed published artifact reference
 ```
 
-This is a successful execution using the publication helper. Computation can occur before or inside
-the context; work outside it is not included in its measurements. On failure inside the context,
-publication does not produce a new successful artifact.
+Model methods write payloads only into `request.output.directory` and return `PayloadMetadata`. They
+must not write the reserved `manifest.yaml`, `config.json` or `request.json`, or publish final directories.
+Directly calling model methods bypasses runner validation/publication; production and test adapters
+must use the runner. Low-level publication helpers remain available for legacy implementations.
 
-Each dispatch constructs a new command instance. Steps can run in separate processes or SLURM jobs;
-persisted artifacts carry their state between invocations. `ModelRepository` dispatches one command
-at a time, not an entire lifecycle. Model CLI adapters, MEDS-DEV descriptors and execution scripts
-arrange the ordered calls.
+Prediction payloads are Parquet shards with keys and probabilities, without ground truth. The runner
+validates their combined key set and probabilities, then optionally attaches evaluation labels. That
+label path is a runner-only argument, never part of the model's prediction request. Install the `data`
+extra for typed prediction execution. Zero-shot outputs include `relaxations.yaml` at their root.
 
-## Shared modules and supporting types
+Outputs must not overlap inputs. Failures before publication preserve the previous published artifact;
+filesystem/crash limitations remain as described in the README. The measured interval includes model
+execution and postprocessing/publication preparation, not initial input validation. Models apply
+`request.execution.seed` to relevant RNGs and subprocesses; core does not seed frameworks implicitly.
 
-Most supporting APIs are functions, not classes. The dependency diagram below shows selected internal
-dependencies, not a pipeline order or an exhaustive import graph.
+The default `Algorithm.validate_inputs` requires fitted-model inputs to record the same algorithm name
+and resolved configuration. Extend it for vocabulary, shape, payload-format and scientific checks.
+Override that default deliberately for a documented policy, such as compatible external pretrained
+models. Reopen persisted artifacts; prediction must not depend on training on the same object.
 
-```mermaid
-flowchart TD
-    conformance[conformance: assertions, fixtures, lifecycle reruns]
-    contracts[contracts: command registry and StepSpec]
-    artifacts[artifacts: manifests, publication, input resolution, results]
-    runtime[runtime: subprocesses, provenance, resource sampling]
-    data[data: indices, targets, split and key validation]
-    evaluation[evaluation: probability validation and truth attachment]
-    tasks[tasks: TaskSpec and RelaxationLedger]
-    integrations[integrations: MEDS-DEV registration]
-    conformance --> contracts
-    conformance --> artifacts
-    conformance --> data
-    conformance --> evaluation
-    conformance --> tasks
-    conformance --> runtime
-    artifacts --> contracts
-    artifacts --> runtime
-    evaluation --> data
-    integrations --> artifacts
-```
+Each successful artifact includes resolved configuration and original request, implementation identity,
+explicit model-checkout provenance, upstream manifest digests and a key-only index digest. Manifest
+digests identify envelopes, not every payload byte. Dataset revisions and model-specific content
+identities remain model/run responsibilities; serialization does not make external data immutable.
+Replaying evaluation additionally requires the runner-only label path recorded in the manifest.
 
-| Implemented type | Responsibility | Used by |
-|---|---|---|
-| [`TaskSpec`](src/meds_model_core/tasks/spec.py) | Frozen dataclass holding ACES criteria, optional predicates and task name; computes a semantics digest and provenance. | Model-owned task-conditioned prediction code. |
-| [`RelaxationLedger`](src/meds_model_core/tasks/spec.py) | Frozen dataclass holding query language, decoded quantity, exactness and rewrite/assumption steps; reads/writes `relaxations.yaml`. | Zero-shot implementations and conformance checks. |
-| [`E2EResult`](src/meds_model_core/conformance/types.py) | Frozen dataclass holding artifact paths, the evaluation index location (`labels_dir`), splits, external inputs/seed and canaries. | Model-local `run_e2e` adapters and shared lifecycle checks. |
-| [`MEDSDevRun`](src/meds_model_core/conformance/types.py) | Frozen dataclass holding invocation arguments, predictions location, evaluation index location and splits. | Model-local MEDS-DEV test adapters. |
-| [`_ProcessTreeMemorySampler`](src/meds_model_core/runtime/resources.py) | Private implementation of sampled memory measurements. | `measured_artifact`; not a model extension interface. |
+## Ownership and compatibility
 
-There is no core `Artifact`, fitted `Model`, or `Algorithm` superclass. Artifact payloads are model-owned
-files, manifests are mappings, and command results are paths. The contract's example `Preprocessor`,
-`FrozenEncoder`, `TaskTrainer`, `TaskPredictor` and `TrajectoryGenerator` are recommended internal
-responsibilities, not implemented core ABCs.
+| Location | Owns |
+|---|---|
+| Core | Profile ABCs, request/artifact types, serialization, runner, shared validation and conformance |
+| Template | Model/config stubs, CLI, profile YAML, test adapters and operational files |
+| Model repository | Concrete typed config, algorithms/components, payload formats, compatibility and scientific tests |
 
-## Should there be an Algorithm superclass and separate step interfaces?
-
-Separate interfaces for supported operations would be a useful extension. The current generic
-`Mapping[str, Any]` boundary makes dispatch uniform, but gives implementers limited type checking and
-editor guidance. Metadata validation cannot replace explicit, typed method signatures.
-
-A mandatory `Algorithm` superclass with every lifecycle method would require models to expose
-operations they do not support: a supervised model has no trajectory generator, a probe predictor
-consumes existing embeddings, and a predict-only model has no persistent training step. Multiple
-profiles also share some implementations without sharing every operation. A base class with only
-common metadata is possible, but by itself would add little to the existing repository registry.
-
-A more useful design would be an **algorithm object that composes narrow capability interfaces**:
-preprocessing, supervised training, supervised prediction, embedding inference, trajectory inference,
-and the other distinct steps. A model family would supply only its supported capabilities, and profiles
-would select the required combinations. Such an object could provide a convenient Python entry point
-while existing command adapters retain the artifact-based CLI and process boundaries.
-
-That design need not require a single long-lived instance or in-memory fitted state. Each capability
-can load its inputs from artifacts and publish its output, so separate jobs and external executables
-remain supported. An ABC can require an implementation; a `Protocol` can describe a compatible object
-without forcing existing model classes into a new inheritance hierarchy.
-
-Before adding this API, define the responsibilities of the algorithm object and typed arguments/results
-for each operation. Keep command names, required paths, profile composition and artifact policies in
-one authoritative schema so interfaces do not become a second, inconsistent specification. Label-free
-prediction and training/context inputs should remain separate in those types. Preserve existing
-`Command` adapters during migration and prove the design against both a simple supervised model and a
-family with several profiles.
-
-**Recommendation:** add typed step interfaces when implementing that API improvement; make an
-`Algorithm` facade optional and based on composition. This document adds no new runtime API and does
-not claim these proposed interfaces already exist.
+Legacy `Command`/`ModelRepository` retain their previous mapping-based behavior. They do not acquire
+the runner's stronger validation/publication automatically. New generated repositories use
+`AlgorithmRepository`. CLI step names and artifact contract version 3 are preserved; existing model
+repositories are not migrated automatically.

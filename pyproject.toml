@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meds-model-core"
-version = "0.3.0a3"
+version = "0.4.0a1"
 description = "Shared MEDS model contracts and conformance boundaries."
 readme = "README.md"
 license = "MIT"
@@ -24,6 +24,9 @@ meds-model-add-to-meds-dev = "meds_model_core.integrations.meds_dev:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/meds_model_core"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"ARCHITECTURE.md" = "meds_model_core/ARCHITECTURE.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

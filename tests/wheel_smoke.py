@@ -7,11 +7,12 @@ import tempfile
 from pathlib import Path
 
 from meds_model_core import measured_artifact, read_manifest
-from meds_model_core.spec import specification
+from meds_model_core.spec import architecture, specification
 
 assert importlib.util.find_spec("polars") is None
 assert importlib.util.find_spec("pytest") is None
 assert specification().splitlines()[0] == "# MEDS Model Repository Contract, version 3"
+assert "classDiagram" in architecture() and "StepRunner" in architecture()
 with tempfile.TemporaryDirectory() as directory:
     artifact = Path(directory) / "artifact"
     with measured_artifact(

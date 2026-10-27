@@ -1,76 +1,24 @@
-"""Profile selection, distinct command contracts, and backend-neutral dispatch."""
+"""Derived legacy contract views and compatibility dispatch.
+
+Profile ABCs own lifecycle order; typed requests own argument definitions. These views keep existing
+manifest readers and callers working without maintaining a second specification.
+"""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from enum import StrEnum
+from dataclasses import MISSING, dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
-
-class CommandName(StrEnum):
-    preprocess_data = "preprocess_data"
-    pretrain = "pretrain"
-    train_supervised = "train_supervised"
-    predict_supervised = "predict_supervised"
-    train_finetune = "train_finetune"
-    predict_finetune = "predict_finetune"
-    infer_embeddings = "infer_embeddings"
-    train_probe = "train_probe"
-    predict_probe = "predict_probe"
-    predict_zero_shot_direct = "predict_zero_shot_direct"
-    infer_trajectories = "infer_trajectories"
-    predict_zero_shot_materialized = "predict_zero_shot_materialized"
-    predict_only = "predict_only"
-
-
-class ArtifactType(StrEnum):
-    patients = "patients"
-    pretrained_model = "pretrained_model"
-    embeddings = "embeddings"
-    trajectories = "trajectories"
-    supervised_model = "supervised_model"
-    finetuned_model = "finetuned_model"
-    probe_model = "probe_model"
-    predictions = "predictions"
-
-
-MODEL_PROFILES: dict[str, tuple[CommandName, ...]] = {
-    "supervised": (CommandName.preprocess_data, CommandName.train_supervised, CommandName.predict_supervised),
-    "finetune": (
-        CommandName.preprocess_data,
-        CommandName.pretrain,
-        CommandName.train_finetune,
-        CommandName.predict_finetune,
-    ),
-    "probe": (
-        CommandName.preprocess_data,
-        CommandName.pretrain,
-        CommandName.infer_embeddings,
-        CommandName.train_probe,
-        CommandName.predict_probe,
-    ),
-    "zero_shot_direct": (
-        CommandName.preprocess_data,
-        CommandName.pretrain,
-        CommandName.predict_zero_shot_direct,
-    ),
-    "zero_shot_materialized": (
-        CommandName.preprocess_data,
-        CommandName.pretrain,
-        CommandName.infer_trajectories,
-        CommandName.predict_zero_shot_materialized,
-    ),
-    "predict_only": (CommandName.preprocess_data, CommandName.predict_only),
-}
-
-ZERO_SHOT_TASK_COMMANDS = {
-    name: frozenset({commands[-1]})
-    for name, commands in MODEL_PROFILES.items()
-    if name.startswith("zero_shot_")
-}
+from ..algorithms import profile_classes, request_type
+from ..artifacts.references import ArtifactReference
+from ..requests import PredictionIndex, TrainingLabels
+from ..tasks.spec import TaskSpec
+from .enums import ArtifactType as ArtifactType
+from .enums import CommandName as CommandName
 
 
 @dataclass(frozen=True)
@@ -123,86 +71,59 @@ class StepSpec:
             raise ValueError("this command is task-independent; do not pass external_task_criteria_file")
 
 
-DATA = ArtifactInput("input_data_dir", ArtifactType.patients)
-PRETRAINED = ArtifactInput("input_pretrained_model_dir", ArtifactType.pretrained_model)
-INDEX = ("external_index_dir",)
-LABELS = ("external_labels_dir",)
-STEP_SPECS: dict[CommandName, StepSpec] = {
-    CommandName.preprocess_data: StepSpec(
-        ArtifactType.patients, "output_data_dir", external_arguments=("external_meds_dir",)
-    ),
-    CommandName.pretrain: StepSpec(ArtifactType.pretrained_model, "output_pretrained_model_dir", (DATA,)),
-    CommandName.train_supervised: StepSpec(
-        ArtifactType.supervised_model,
-        "output_supervised_model_dir",
-        (DATA,),
-        LABELS,
-        label_access="train_tuning",
-    ),
-    CommandName.train_finetune: StepSpec(
-        ArtifactType.finetuned_model,
-        "output_finetuned_model_dir",
-        (DATA, PRETRAINED),
-        LABELS,
-        label_access="train_tuning",
-    ),
-    CommandName.infer_embeddings: StepSpec(
-        ArtifactType.embeddings, "output_embeddings_dir", (DATA, PRETRAINED), INDEX, requires_splits=True
-    ),
-    CommandName.train_probe: StepSpec(
-        ArtifactType.probe_model,
-        "output_probe_model_dir",
-        (ArtifactInput("input_embeddings_dir", ArtifactType.embeddings),),
-        LABELS,
-        label_access="train_tuning",
-    ),
-    CommandName.predict_supervised: StepSpec(
-        ArtifactType.predictions,
-        "output_predictions_dir",
-        (DATA, ArtifactInput("input_supervised_model_dir", ArtifactType.supervised_model)),
-        INDEX,
-        True,
-    ),
-    CommandName.predict_finetune: StepSpec(
-        ArtifactType.predictions,
-        "output_predictions_dir",
-        (DATA, ArtifactInput("input_finetuned_model_dir", ArtifactType.finetuned_model)),
-        INDEX,
-        True,
-    ),
-    CommandName.predict_probe: StepSpec(
-        ArtifactType.predictions,
-        "output_predictions_dir",
-        (
-            ArtifactInput("input_embeddings_dir", ArtifactType.embeddings),
-            ArtifactInput("input_probe_model_dir", ArtifactType.probe_model),
-        ),
-        INDEX,
-        True,
-    ),
-    CommandName.predict_zero_shot_direct: StepSpec(
-        ArtifactType.predictions,
-        "output_predictions_dir",
-        (DATA, PRETRAINED),
-        (*INDEX, "external_task_criteria_file"),
-        True,
-        task_conditioned=True,
-    ),
-    CommandName.infer_trajectories: StepSpec(
-        ArtifactType.trajectories, "output_trajectories_dir", (DATA, PRETRAINED), INDEX, True
-    ),
-    CommandName.predict_zero_shot_materialized: StepSpec(
-        ArtifactType.predictions,
-        "output_predictions_dir",
-        (DATA, ArtifactInput("input_trajectories_dir", ArtifactType.trajectories)),
-        (*INDEX, "external_meds_dir", "external_task_criteria_file"),
-        True,
-        task_conditioned=True,
-    ),
-    CommandName.predict_only: StepSpec(
-        ArtifactType.predictions, "output_predictions_dir", (DATA,), INDEX, True, label_access="context_only"
-    ),
-}
+def _step_spec(request):
+    artifacts = []
+    external = []
+    requires_splits = False
+    label_access = "none"
+    task_conditioned = False
+    for field, kind in request.argument_fields():
+        if field.name in ("output", "execution"):
+            continue
+        required = field.default is MISSING and field.default_factory is MISSING
+        if isinstance(kind, type) and issubclass(kind, ArtifactReference):
+            artifacts.append(ArtifactInput(field.metadata["argument"], kind.kind))
+        elif kind is PredictionIndex:
+            external.append("external_index_dir")
+            requires_splits = True
+        elif kind is TrainingLabels:
+            external.append("external_labels_dir")
+            label_access = "train_tuning"
+        elif kind is TaskSpec:
+            external.append("external_task_criteria_file")
+            task_conditioned = True
+        elif field.name == "context":
+            label_access = "context_only"
+        elif required and "argument" in field.metadata:
+            external.append(field.metadata["argument"])
+    return StepSpec(
+        request.result_type.kind,
+        request.output_argument,
+        tuple(artifacts),
+        tuple(external),
+        requires_splits,
+        label_access,
+        task_conditioned,
+    )
+
+
+MODEL_PROFILES = MappingProxyType(
+    {cls.profile: tuple(CommandName(step) for step in cls.steps) for cls in profile_classes()}
+)
+STEP_SPECS = MappingProxyType(
+    {
+        step: _step_spec(request_type(profile, step))
+        for profile, steps in MODEL_PROFILES.items()
+        for step in steps
+    }
+)
+ZERO_SHOT_TASK_COMMANDS = MappingProxyType(
+    {
+        profile: frozenset(step for step in steps if STEP_SPECS[step].task_conditioned)
+        for profile, steps in MODEL_PROFILES.items()
+        if profile.startswith("zero_shot_")
+    }
+)
 
 
 class Command(ABC):

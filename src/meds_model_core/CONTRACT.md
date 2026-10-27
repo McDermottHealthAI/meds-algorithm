@@ -317,34 +317,58 @@ download it.
 
 ### Public classes and ownership
 
-| Symbol | Required behavior |
+New implementations use the typed algorithm API. Each profile class owns its ordered lifecycle and
+abstract typed method signatures. Each request class owns its fields, CLI names, output argument and
+result artifact type. Existing `MODEL_PROFILES` and `STEP_SPECS` are derived read-only views, not another
+hand-maintained specification.
+
+| Symbol | Responsibility |
 |---|---|
-| `CommandName` | Enumerates the distinct supported steps. No generic `infer`, `supervised_train`, or `predict` aliases. |
-| `ArtifactType` | Separates patients, pretrained models, embeddings, trajectories, three kinds of task model, and predictions. |
-| `ArtifactInput(argument, artifact_type)` | Describes one required upstream artifact argument and its envelope type. |
-| `StepSpec` | Declares `artifact_type`, `output_argument`, `artifact_inputs`, `external_arguments`, `requires_splits`, `label_access`, and `task_conditioned`. Immutable. |
-| `STEP_SPECS` | Maps every `CommandName` to its specification. There are no profile-dependent meanings of one step. |
-| `Command.run(arguments: Mapping[str, Any]) -> Path` | Model-owned abstract method. Returns the complete published artifact directory or raises. No successful stub or skipped-stage artifact. |
-| `Command.__call__(arguments) -> Path` | Validates required path arguments, split-list shape, boolean overwrite and task-argument routing, then invokes `run`. |
-| `ModelRepository(profiles: Sequence[str], commands: Mapping[CommandName, type[Command]])` | Requires unique declared profiles and exactly their command union. Registry keys must agree with each class's `name`. |
-| `ModelRepository.run(name, arguments, *, profile=None) -> Path` | Selects a declared profile; rejects cross-profile dispatch. Omitting the profile is valid only for a single-profile repository. |
-| `TaskSpec`, `RelaxationLedger` | Bind task-conditioned predictions to criteria/predicates and report any semantic approximations. |
+| `Algorithm` | Common model identity/configuration, abstract `preprocess_data`, compatibility hook. |
+| `SupervisedAlgorithm`, `FinetuneAlgorithm`, `ProbeAlgorithm`, `ZeroShotDirectAlgorithm`, `ZeroShotMaterializedAlgorithm`, `PredictOnlyAlgorithm` | Require exactly the operations of each profile. Pretrained profiles share `PretrainedAlgorithm.pretrain`. |
+| `ModelConfig` | Base for a model-owned frozen dataclass: typed fields, defaults, `validate`, strict serialization. |
+| `ExecutionOptions` | Nonnegative integer seed and boolean overwrite policy. Models apply the seed to their RNGs. |
+| `StepRequest` subclasses | Frozen, typed inputs plus output destination and execution options for each operation. |
+| `ArtifactReference` subclasses | Lazy references to prepared data, pretrained/fitted models, embeddings, trajectories and predictions. |
+| `PredictionIndex`, `TrainingLabels`, `PredictionContext` | Distinct key-only, train/tuning target and explicit disjoint-context boundaries. |
+| `ArtifactDestination`, `PayloadMetadata` | Staging destination supplied to model code; model-returned payload format/version. |
+| `AlgorithmRepository` | Profile-to-concrete-class association; fresh instance per dispatch, no duplicate step registry. |
+| `StepRunner` | Validate, call compatibility hook, stage/measure model work, validate predictions, attach optional truth, save configuration/request and publish. Returns a typed artifact. |
+| `TaskSpec`, `RelaxationLedger` | Bind task-conditioned predictions and record semantic approximations. |
 
-`StepSpec.validate` checks the interface shape; it does **not** verify the dataset, label isolation,
-upstream content identity, tensor shape, payload format, weights, or scientific correctness. Each
-concrete command MUST validate those relevant to its inputs before expensive work. Unknown
-model-specific keys are allowed at this boundary, but the concrete command MUST reject misspellings and
-invalid values and include resolved defaults in its configuration digest.
+Concrete model methods MUST write payloads only to the staging destination supplied by the runner and
+return `PayloadMetadata`. The runner alone writes `manifest.yaml`, `config.json`, `request.json` and
+publishes the destination. Adapters and the CLI MUST use the same runner path; directly calling a model
+method bypasses validation and publication. Model methods MUST NOT emit `boolean_value`; evaluation
+truth is attached by the runner after all scores have been validated, using a runner-only label path.
+Zero-shot model methods write `relaxations.yaml` at the prediction artifact root.
 
-Implement the generated `PreprocessData`, `Pretrain`, `TrainSupervised`, `PredictSupervised`,
-`TrainFinetune`, `PredictFinetune`, `InferEmbeddings`, `TrainProbe`, `PredictProbe`,
-`InferTrajectories`, `PredictZeroShotDirect`, `PredictZeroShotMaterialized`, and `PredictOnly` classes
-that belong to the declared profiles. Only one class is registered for each shared step. Helpers inside
-those classes are model-owned; no generic tensor or DataLoader interface is imposed.
+`validate_inputs(request)` is the model's explicit compatibility hook, invoked before model computation.
+Its default rejects fitted-model inputs with a different algorithm name or resolved configuration.
+Extend it for vocabulary, payload format, shape and scientific compatibility. A deliberate override for
+external pretrained models or compatible configurations MUST be documented and tested. Existing
+artifact-type checks cannot establish these scientific properties automatically.
+
+Model configuration MUST be a frozen `ModelConfig` dataclass with model-owned fields and validation.
+Use immutable nested dataclasses/tuples, supported scalar types and paths. Reject unknown settings,
+wrong types, invalid values and unsupported serialized objects. Persist all resolved defaults, schema
+version and concrete configuration type. A serialized request/configuration MUST round-trip through its
+explicit class; loaders MUST NOT import a class named by a document. Relative paths in configuration
+files resolve against that file's parent. Methods reopen persisted inputs and MUST NOT depend on prior
+calls on the same Python object. Model tests MUST exercise fresh-process reconstruction and execution.
+
+The original `Command.run(mapping) -> Path` and `ModelRepository` remain legacy APIs for existing
+repositories. Their legacy validation is limited to interface shapes and routing; they do not gain the
+typed runner's guarantees automatically. New generated models use typed profile classes. The external
+CLI step names and artifact contract version remain unchanged; this does not migrate existing models.
 
 ### Step arguments and artifacts
 
-Every step accepts optional boolean `do_overwrite` (default false). Dataset predicates may be supplied to
+Every step accepts optional boolean `do_overwrite` (default false), integer `seed` (default 0), and
+`config_file` (a JSON/YAML model-configuration mapping or saved JSON envelope). The typed CLI rejects
+unknown step arguments; model hyperparameters belong in the typed configuration, not arbitrary extra
+step keys. `predict_only` context requires explicit `context_splits` with train and/or tuning. Every step
+has a typed request carrying the arguments below. Dataset predicates may be supplied to
 preprocessing; task predicates may be supplied to zero-shot prediction. Inference and prediction require
 an explicit nonempty `splits` list. `external_index_dir` identifies the upstream keys-only view; `external_labels_dir` supplies permitted
 training/context outcomes. Optional `external_evaluation_labels_dir` is evaluation-only, after scoring.
@@ -489,7 +513,7 @@ batching ownership, missing-data semantics, save/load compatibility and exceptio
 
 ### Completion evidence per profile
 
-`PROFILES` and `COMMANDS` declare capability; `STUB_PROFILES` records unfinished implementations.
+`PROFILES` and `IMPLEMENTATIONS` declare capability; `STUB_PROFILES` records unfinished implementations.
 Acceptance tests are parametrized over every declared profile. Removing one stub flag must not hide
 another profile's missing implementation. `run_e2e(tmp_path, *, profile, **inputs)` and
 `prepare_meds_dev_run(meds_dev, tmp_path, *, profile)` must honor profile selection and external overrides.

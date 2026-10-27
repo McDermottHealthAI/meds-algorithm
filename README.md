@@ -7,8 +7,8 @@ and training targets, validates prediction outputs, and provides reusable confor
 Model repositories import these utilities so fixes can be distributed through a package update.
 Model architectures, tokenizers, training objectives and task-specific logic stay in the model repository.
 
-See the [architecture and UML diagrams](ARCHITECTURE.md) for the current class structure, command
-execution, package dependencies, and the tradeoffs around an `Algorithm` superclass and step interfaces.
+See the [architecture and UML diagrams](ARCHITECTURE.md) for the profile hierarchy, typed requests,
+model-owned configuration, artifact references and shared execution path.
 
 ## Package layout
 
@@ -16,8 +16,14 @@ execution, package dependencies, and the tradeoffs around an `Algorithm` supercl
 src/meds_model_core/
 ├── CONTRACT.md                 # canonical normative specification, included in the wheel
 ├── spec.py                     # installed specification reader
-├── contracts/commands.py       # profiles, command classes, step metadata, dispatch
+├── algorithms.py               # Algorithm and profile ABCs, lifecycle order
+├── requests.py                 # frozen per-step requests and CLI field mappings
+├── configuration.py            # model-owned config base and execution options
+├── serialization.py            # strict, versioned config/request JSON serialization
+├── runner.py                   # validate, execute, measure, publish; CLI adapter
+├── contracts/commands.py       # derived compatibility views and legacy dispatch
 ├── artifacts/
+│   ├── references.py           # lazy typed artifact references and payload metadata
 │   ├── manifest.py             # measured artifacts, envelope reading and digests
 │   ├── publication.py          # unique staging, exclusive writers and overwrite rollback
 │   ├── inputs.py               # resolve recorded upstream artifact paths
@@ -49,6 +55,12 @@ see the [release guide](https://github.com/florian6973/meds-model-core/blob/main
 The installed CLI provides `meds-model-core-spec`, `meds-model-resolve-input`, and
 `meds-model-add-to-meds-dev`. Model repositories provide their own `meds-model` entry point.
 
+New model repositories implement `Algorithm` profile subclasses, receive frozen typed requests, and
+execute through `AlgorithmRepository`/`StepRunner`. Their own frozen `ModelConfig` subclass defines
+hyperparameters, defaults and validation. Use `config_file=...` for a JSON/YAML values mapping or a
+previously saved `config.json`. Typed prediction execution requires the `data` extra. See the
+[architecture guide](ARCHITECTURE.md) for the complete ownership and serialization model.
+
 ## Ownership
 
 The template imports this package directly; it does not generate a `meds_model_contract` package or
@@ -62,7 +74,8 @@ package. Model `SPEC.md` files point to it; model implementation reports record 
 
 ## Publication, provenance and measurement
 
-Pass the model checkout explicitly to `measured_artifact(..., repo=model_root)`. The package never
+Pass the model checkout explicitly to `StepRunner(repo=model_root)` or, for legacy implementations,
+`measured_artifact(..., repo=model_root)`. The package never
 infers the model from its own installation path or the working directory. Without a supplied checkout,
 commit and dirty state are unknown (`null`); wheel deployments must retain model build provenance
 separately rather than inventing a checkout revision.
@@ -101,6 +114,16 @@ MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selectio
 training. Keep each model's data-access and cluster approval rules in its own repository.
 
 ## Changes
+
+### 0.4.0a1
+
+- Add profile ABCs, typed requests/artifact references and a shared runner that owns validation,
+  measured publication and post-score truth attachment.
+- Add strict immutable model-owned configuration and versioned config/request serialization; record
+  complete resolved values, upstream manifest identities and key-only index identities.
+- Derive legacy profile/step metadata from the new classes; preserve existing CLI names, contract
+  version 3 and legacy mapping-based adapters. Model migrations remain separate.
+- Include the canonical API/UML architecture guide in the wheel for downstream documentation.
 
 ### 0.3.0a3
 
