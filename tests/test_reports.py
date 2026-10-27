@@ -1,6 +1,6 @@
 import pytest
 
-from meds_model_core.conformance.reports import assert_implementation_report
+from meds_algorithm_core.conformance.reports import assert_implementation_report
 
 
 def report():

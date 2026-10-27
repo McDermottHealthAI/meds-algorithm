@@ -79,25 +79,7 @@ wheels = [
 ]
 
 [[package]]
-name = "meds-evaluation"
-version = "0.0.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "hydra-core" },
-    { name = "loguru" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "polars" },
-    { name = "pyarrow" },
-    { name = "scikit-learn" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/de/fc/44a77a8cfee1e88f039eb5cd460fec917f4a338e9106dda791605931e556/meds_evaluation-0.0.3.tar.gz", hash = "sha256:586d5f0b27823fef91e59e1f94744ee52fe64932ca73be2ff4c321aff2ab5bfb", size = 17257, upload-time = "2025-03-03T21:35:06.025Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/fc/d3ca372b9d0724eb334dc7f50676ba8f12c30bc3c35be17178f28313f2c2/meds_evaluation-0.0.3-py3-none-any.whl", hash = "sha256:fb63459b293634bb6e26c0c1ae097e7c22865eb0ba251e7b137a3cb2b9a63035", size = 9420, upload-time = "2025-03-03T21:35:04.449Z" },
-]
-
-[[package]]
-name = "meds-model-core"
+name = "meds-algorithm-core"
 version = "0.4.0a1"
 source = { editable = "." }
 dependencies = [
@@ -143,6 +125,24 @@ provides-extras = ["data", "conformance", "test"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff" }]
+
+[[package]]
+name = "meds-evaluation"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "hydra-core" },
+    { name = "loguru" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "polars" },
+    { name = "pyarrow" },
+    { name = "scikit-learn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/fc/44a77a8cfee1e88f039eb5cd460fec917f4a338e9106dda791605931e556/meds_evaluation-0.0.3.tar.gz", hash = "sha256:586d5f0b27823fef91e59e1f94744ee52fe64932ca73be2ff4c321aff2ab5bfb", size = 17257, upload-time = "2025-03-03T21:35:06.025Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/fc/d3ca372b9d0724eb334dc7f50676ba8f12c30bc3c35be17178f28313f2c2/meds_evaluation-0.0.3-py3-none-any.whl", hash = "sha256:fb63459b293634bb6e26c0c1ae097e7c22865eb0ba251e7b137a3cb2b9a63035", size = 9420, upload-time = "2025-03-03T21:35:04.449Z" },
+]
 
 [[package]]
 name = "narwhals"

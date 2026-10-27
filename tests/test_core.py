@@ -3,9 +3,9 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from meds_model_core.contracts.commands import STEP_SPECS, CommandName
-from meds_model_core.data.index import read_index, split_files
-from meds_model_core.spec import specification
+from meds_algorithm_core.contracts.commands import STEP_SPECS, CommandName
+from meds_algorithm_core.data.index import read_index, split_files
+from meds_algorithm_core.spec import specification
 
 
 def labelled_file(path, subject=1):
@@ -71,7 +71,7 @@ def test_roles_distinguish_ground_truth_from_prediction_keys():
         assert spec.label_access == "none"
     assert [i.argument for i in STEP_SPECS[CommandName.predict_probe].artifact_inputs] == [
         "input_embeddings_dir",
-        "input_probe_model_dir",
+        "input_probe_algorithm_dir",
     ]
     for step in (CommandName.predict_supervised, CommandName.predict_finetune):
         assert "input_data_dir" in [i.argument for i in STEP_SPECS[step].artifact_inputs]
@@ -79,8 +79,8 @@ def test_roles_distinguish_ground_truth_from_prediction_keys():
 
 def test_specification_is_an_installed_package_resource():
     spec = specification()
-    assert "# MEDS Model Repository Contract, version 3" in spec
-    assert "Ground-truth target values the model may use" in spec
+    assert "# MEDS Algorithm Repository Contract, version 4" in spec
+    assert "Ground-truth target values the algorithm may use" in spec
     assert "external_index_dir" in spec
 
 

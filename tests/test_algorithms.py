@@ -10,12 +10,12 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from meds_model_core import (
+from meds_algorithm_core import (
+    AlgorithmConfig,
     AlgorithmRepository,
     ArtifactDestination,
     ExecutionOptions,
     FinetuneAlgorithm,
-    ModelConfig,
     PayloadMetadata,
     PredictOnlyAlgorithm,
     ProbeAlgorithm,
@@ -25,8 +25,8 @@ from meds_model_core import (
     ZeroShotMaterializedAlgorithm,
     read_manifest,
 )
-from meds_model_core.algorithms import profile_classes, request_type
-from meds_model_core.requests import (
+from meds_algorithm_core.algorithms import profile_classes, request_type
+from meds_algorithm_core.requests import (
     PredictionIndex,
     PredictSupervisedRequest,
     PreprocessDataRequest,
@@ -36,12 +36,12 @@ from meds_model_core.requests import (
 
 
 @dataclass(frozen=True)
-class FeatureConfig(ModelConfig):
+class FeatureConfig(AlgorithmConfig):
     format: str = "toy"
 
 
 @dataclass(frozen=True)
-class ToyConfig(ModelConfig):
+class ToyConfig(AlgorithmConfig):
     features: FeatureConfig = field(default_factory=FeatureConfig)
     iterations: int = 10
 
@@ -61,10 +61,10 @@ class ToyAlgorithm(SupervisedAlgorithm):
     def train_supervised(self, request):
         probability = request.labels.read()["boolean_value"].mean()
         (request.output.directory / "probability.txt").write_text(str(probability))
-        return PayloadMetadata("toy-model")
+        return PayloadMetadata("toy-algorithm")
 
     def predict_supervised(self, request):
-        probability = float((request.model.directory / "probability.txt").read_text())
+        probability = float((request.algorithm.directory / "probability.txt").read_text())
         frame = request.index.read().with_columns(pl.lit(probability).alias("predicted_boolean_probability"))
         frame.write_parquet(request.output.directory / "predictions.parquet")
         return PayloadMetadata("toy-predictions")
@@ -87,17 +87,17 @@ def prepared(tmp_path):
         PreprocessDataRequest(meds_dir=meds, output=ArtifactDestination(tmp_path / "data")),
         profile="supervised",
     )
-    model = runner.run(
+    algorithm = runner.run(
         ToyAlgorithm(),
         "train_supervised",
         TrainSupervisedRequest(
-            data=data, labels=TrainingLabels(labels), output=ArtifactDestination(tmp_path / "model")
+            data=data, labels=TrainingLabels(labels), output=ArtifactDestination(tmp_path / "algorithm")
         ),
         profile="supervised",
     )
     request = PredictSupervisedRequest(
         data=data,
-        model=model,
+        algorithm=algorithm,
         index=PredictionIndex(labels, ("held_out",)),
         output=ArtifactDestination(tmp_path / "predictions"),
     )
@@ -115,7 +115,7 @@ def test_configuration_is_strict_immutable_and_roundtrips(tmp_path):
     path = config.save(tmp_path / "config.json")
     assert ToyConfig.load(path) == config
     with pytest.raises(ValueError, match="type or schema"):
-        ModelConfig.load(path)
+        AlgorithmConfig.load(path)
 
 
 def test_runner_publishes_resolved_config_and_request(prepared):
@@ -129,7 +129,7 @@ def test_runner_publishes_resolved_config_and_request(prepared):
     )
     manifest = result.read_manifest()
     assert manifest["algorithm"]["config"] == ToyConfig().to_dict()
-    assert manifest["inputs"]["input_supervised_model_dir"]["manifest_digest"].startswith("sha256:")
+    assert manifest["inputs"]["input_supervised_algorithm_dir"]["manifest_digest"].startswith("sha256:")
     assert manifest["inputs"]["external_index_dir"]["keys_digest"].startswith("sha256:")
     assert manifest["invocation"]["request"]["output"]["directory"] == str(result.directory)
     assert PredictSupervisedRequest.load(result.directory / "request.json") == request
@@ -147,8 +147,8 @@ def test_reloaded_request_runs_in_a_fresh_process(prepared, tmp_path):
 import sys
 from pathlib import Path
 from test_algorithms import ToyAlgorithm, ToyConfig
-from meds_model_core import StepRunner
-from meds_model_core.requests import PredictSupervisedRequest
+from meds_algorithm_core import StepRunner
+from meds_algorithm_core.requests import PredictSupervisedRequest
 root = Path(sys.argv[1])
 StepRunner().run(ToyAlgorithm(ToyConfig.load(root / 'config.json')), 'predict_supervised',
     PredictSupervisedRequest.load(root / 'request.json'), profile='supervised')
@@ -165,7 +165,7 @@ StepRunner().run(ToyAlgorithm(ToyConfig.load(root / 'config.json')), 'predict_su
     )
 
 
-def test_runner_validates_before_model_and_preserves_previous_output(prepared):
+def test_runner_validates_before_algorithm_and_preserves_previous_output(prepared):
     runner, request = prepared
     with pytest.raises(ValueError, match="configuration mismatch"):
         runner.run(
@@ -206,7 +206,7 @@ def test_request_types_and_paths_cannot_cross_boundaries(prepared):
         )
     arguments = {
         "input_data_dir": str(request.data.directory),
-        "input_supervised_model_dir": str(request.model.directory),
+        "input_supervised_algorithm_dir": str(request.algorithm.directory),
         "external_index_dir": str(request.index.directory),
         "splits": ["held_out"],
         "output_predictions_dir": str(request.output.directory),
@@ -220,10 +220,10 @@ def test_request_types_and_paths_cannot_cross_boundaries(prepared):
 
 
 def test_profile_requests_are_the_source_of_legacy_metadata():
-    from meds_model_core import MODEL_PROFILES, STEP_SPECS
+    from meds_algorithm_core import ALGORITHM_PROFILES, STEP_SPECS
 
     for profile in profile_classes():
-        assert tuple(MODEL_PROFILES[profile.profile]) == profile.steps
+        assert tuple(ALGORITHM_PROFILES[profile.profile]) == profile.steps
         for step in profile.steps:
             request = request_type(profile.profile, step)
             assert STEP_SPECS[step].artifact_type == request.result_type.kind
@@ -239,17 +239,17 @@ def test_profile_abcs_require_complete_implementations():
 
 def test_config_file_resolves_paths_and_rejects_unsupported_values(tmp_path):
     @dataclass(frozen=True)
-    class Paths(ModelConfig):
+    class Paths(AlgorithmConfig):
         vocabulary: Path
 
-    config_file = tmp_path / "model.yaml"
+    config_file = tmp_path / "config.yaml"
     config_file.write_text("vocabulary: assets/vocab.json\n")
     config = Paths.from_file(config_file)
     assert config.vocabulary == (tmp_path / "assets/vocab.json").resolve()
     assert Paths.load(config.save(tmp_path / "resolved.json")) == config
 
     @dataclass(frozen=True)
-    class Number(ModelConfig):
+    class Number(AlgorithmConfig):
         value: float
 
     for invalid in (float("nan"), float("inf"), True, "1.0"):
@@ -257,8 +257,38 @@ def test_config_file_resolves_paths_and_rejects_unsupported_values(tmp_path):
             Number(value=invalid)
 
 
+def test_version_four_rejects_old_artifact_and_argument_names(prepared):
+    import yaml
+
+    _, request = prepared
+    assert "algorithm" in request.to_dict() and "model" not in request.to_dict()
+    path = request.algorithm.directory / "manifest.yaml"
+    manifest = read_manifest(request.algorithm.directory)
+    assert manifest["contract_version"] == "4"
+    assert manifest["artifact"]["type"] == "supervised_algorithm"
+    manifest["contract_version"] = "3"
+    path.write_text(yaml.safe_dump(manifest))
+    with pytest.raises(ValueError, match="version 4"):
+        read_manifest(request.algorithm.directory)
+    manifest["contract_version"] = "4"
+    manifest["artifact"]["type"] = "supervised_model"
+    path.write_text(yaml.safe_dump(manifest))
+    with pytest.raises(ValueError, match="artifact type"):
+        read_manifest(request.algorithm.directory)
+    with pytest.raises(ValueError, match="Unknown or forbidden"):
+        PredictSupervisedRequest.from_arguments(
+            {
+                "input_data_dir": request.data.directory,
+                "input_supervised_model_dir": request.algorithm.directory,
+                "external_index_dir": request.index.directory,
+                "splits": request.index.splits,
+                "output_predictions_dir": request.output.directory,
+            }
+        )
+
+
 def test_predict_only_context_must_be_explicit_and_disjoint(prepared, tmp_path):
-    from meds_model_core.requests import PredictionContext, PredictOnlyRequest
+    from meds_algorithm_core.requests import PredictionContext, PredictOnlyRequest
 
     runner, original = prepared
     request = PredictOnlyRequest(
@@ -269,7 +299,7 @@ def test_predict_only_context_must_be_explicit_and_disjoint(prepared, tmp_path):
     )
     assert PredictOnlyRequest.load(request.save(tmp_path / "context-request.json")) == request
     runner.run(AllProfiles(), "predict_only", request, profile="predict_only")
-    # A context row with an evaluated key must fail before invoking model code.
+    # A context row with an evaluated key must fail before invoking algorithm code.
     held_out = pl.read_parquet(original.index.directory / "held_out.parquet")
     held_out.write_parquet(original.index.directory / "train.parquet")
     with pytest.raises(ValueError, match="disjoint"):
@@ -282,7 +312,7 @@ def test_predict_only_context_must_be_explicit_and_disjoint(prepared, tmp_path):
     assert not (tmp_path / "bad-context").exists()
 
 
-def test_invalid_model_metadata_or_ground_truth_never_publishes(prepared, tmp_path):
+def test_invalid_algorithm_metadata_or_ground_truth_never_publishes(prepared, tmp_path):
     runner, original = prepared
 
     class WrongReturn(ToyAlgorithm):
@@ -333,7 +363,7 @@ class AllProfiles(
                 pl.lit(0.5).alias("predicted_boolean_probability")
             ).write_parquet(request.output.directory / "predictions.parquet")
             if getattr(request, "task", None) is not None:
-                from meds_model_core import RelaxationLedger
+                from meds_algorithm_core import RelaxationLedger
 
                 RelaxationLedger("toy", "probability", True).write(request.output.directory)
         else:
@@ -357,7 +387,7 @@ class AllProfiles(
 
 @pytest.mark.parametrize("profile", [cls.profile for cls in profile_classes()])
 def test_every_profile_runs_through_typed_cli_adapter(profile, tmp_path):
-    from meds_model_core import STEP_SPECS
+    from meds_algorithm_core import STEP_SPECS
 
     inputs = tmp_path / "inputs"
     inputs.mkdir()

@@ -3,8 +3,8 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from meds_model_core import attach_ground_truth, check_decoded, read_context_labels
-from meds_model_core.conformance.assertions import assert_prediction_keys, read_predictions
+from meds_algorithm_core import attach_ground_truth, check_decoded, read_context_labels
+from meds_algorithm_core.conformance.assertions import assert_prediction_keys, read_predictions
 
 
 def test_every_prediction_shard_is_validated_and_duplicate_keys_fail(tmp_path):
