@@ -5,12 +5,12 @@ from importlib.resources import files
 
 
 def specification() -> str:
-    return files("meds_algorithm_core").joinpath("CONTRACT.md").read_text(encoding="utf-8")
+    return files("meds_algorithm").joinpath("CONTRACT.md").read_text(encoding="utf-8")
 
 
 def architecture() -> str:
     """Read the bundled API/UML guide maintained as ARCHITECTURE.md in the repository."""
-    return files("meds_algorithm_core").joinpath("ARCHITECTURE.md").read_text(encoding="utf-8")
+    return files("meds_algorithm").joinpath("ARCHITECTURE.md").read_text(encoding="utf-8")
 
 
 def main() -> None:

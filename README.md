@@ -1,4 +1,4 @@
-# meds-algorithm-core
+# meds-algorithm
 
 Shared infrastructure for implementing and validating MEDS algorithm repositories. The package defines
 algorithm profiles and command contracts, manages artifacts and run provenance, reads prediction indices
@@ -13,7 +13,7 @@ algorithm-owned configuration, artifact references and shared execution path.
 ## Package layout
 
 ```text
-src/meds_algorithm_core/
+src/meds_algorithm/
 ├── CONTRACT.md                 # canonical normative specification, included in the wheel
 ├── spec.py                     # installed specification reader
 ├── algorithms.py               # Algorithm and profile ABCs, lifecycle order
@@ -43,16 +43,16 @@ src/meds_algorithm_core/
 ## Installation and dependencies
 
 Install a reviewed revision with
-`pip install 'meds-algorithm-core @ git+https://github.com/florian6973/meds-algorithm-core.git@<full-commit-sha>'`.
+`pip install 'meds-algorithm @ git+https://github.com/florian6973/meds-algorithm.git@<full-commit-sha>'`.
 The template currently records the exact SHA. For package-index release checks and publishing setup,
-see the [release guide](https://github.com/florian6973/meds-algorithm-core/blob/main/RELEASING.md).
+see the [release guide](https://github.com/florian6973/meds-algorithm/blob/main/RELEASING.md).
 
 - Base package: PyYAML; no dataframe engine, test runner, GPU or algorithm framework is imported by base APIs.
 - `data` extra: Polars for index/target reads and prediction validation.
 - `conformance` extra: pytest, Polars, PyArrow and the pinned MEDS evaluation schema implementation.
 - `test` extra: dependencies for developing and testing this package.
 
-The installed CLI provides `meds-algorithm-core-spec`, `meds-algorithm-resolve-input`, and
+The installed CLI provides `meds-algorithm-spec`, `meds-algorithm-resolve-input`, and
 `meds-algorithm-add-to-meds-dev`. Algorithm repositories provide their own `meds-algorithm` entry point.
 
 New algorithm repositories implement `Algorithm` profile subclasses, receive frozen typed requests, and
@@ -123,6 +123,13 @@ MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selectio
 training. Keep each algorithm's data-access and cluster approval rules in its own repository.
 
 ## Changes
+
+### 0.4.0a4
+
+- Rename the repository/distribution from `meds-algorithm-core` to `meds-algorithm`, the Python package
+  from `meds_algorithm_core` to `meds_algorithm`, and the contract command to `meds-algorithm-spec`.
+  Update imports and dependency pins together. No old-name aliases are installed; serialized envelopes
+  with old package-qualified type names require an explicit migration before loading.
 
 ### 0.4.0a3
 

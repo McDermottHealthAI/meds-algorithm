@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError, dataclass, replace
 
 import pytest
 
-from meds_algorithm_core import (
+from meds_algorithm import (
     AlgorithmConfig,
     AlgorithmRepository,
     NNConfig,

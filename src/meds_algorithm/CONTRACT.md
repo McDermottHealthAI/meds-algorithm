@@ -1,6 +1,6 @@
 # MEDS Algorithm Repository Contract, version 4
 
-This document is the single authoritative contract shipped with meds-algorithm-core. Algorithm repositories
+This document is the single authoritative contract shipped with meds-algorithm. Algorithm repositories
 pin a core version and refer to its contract; they do not maintain copies of these rules. A conforming repository turns a MEDS dataset, an optional task, and an optional semantic
 specification into MEDS predictions through one or more of six fixed algorithm profiles. How a command performs its
 work is deliberately outside this contract.
@@ -50,7 +50,7 @@ the same files, not permission to load their outcome columns. A physically separ
 also supported. Neither representation rebuilds or filters the upstream cohort.
 
 Once scores are fixed, an evaluation adapter MAY use `external_evaluation_labels_dir` to join truth onto the
-predictions by key (`meds_algorithm_core.attach_ground_truth`), because meds-evaluation reads ground truth
+predictions by key (`meds_algorithm.attach_ground_truth`), because meds-evaluation reads ground truth
 from the predictions file. Nothing computed from that join may feed back into a prediction.
 
 The cohort is built upstream, not in the algorithm repository. The index and its labels come from one
@@ -100,7 +100,7 @@ A supervised algorithm learns what to predict from labels. A zero-shot algorithm
 definition itself is an input. The task language is [ACES](https://eventstreamaces.readthedocs.io/): a task
 is an ACES criteria file, supplied through `external_task_criteria_file`, bound to the dataset predicates of
 section 2.3 when the criteria do not define their own. The pair is the *task specification*
-(`meds_algorithm_core.TaskSpec`).
+(`meds_algorithm.TaskSpec`).
 
 - Every command of a `zero_shot_*` profile whose output depends on the task (`ZERO_SHOT_TASK_COMMANDS`:
   `predict_zero_shot_direct` and `predict_zero_shot_materialized`) MUST receive `external_task_criteria_file`, MUST
@@ -112,7 +112,7 @@ section 2.3 when the criteria do not define their own. The pair is the *task spe
   `TASK_PREDICATES_FILE`. Through MEDS-DEV there is no conflict, because its task YAMLs carry their label
   predicates and `{predicates_path}` holds dataset facts only.
 - Those commands receive the task index through `external_index_dir` for its keys only. They MUST read it
-  through `meds_algorithm_core.read_index`, or an equivalent that never selects a label column.
+  through `meds_algorithm.read_index`, or an equivalent that never selects a label column.
 - Through MEDS-DEV, the criteria path reaches `algorithms/<profile>/model.yaml` as `{task_criteria_path}` (MEDS-DEV PR #330):
   the `task_criteria_path` argument, else the registered criteria file of `task_name`. MEDS-DEV forwards
   the original task; relaxing it is the algorithm's job.
@@ -171,7 +171,7 @@ implementation-defined, as in section 4.
 
 **Relaxations.** Most zero-shot algorithms cannot answer an arbitrary ACES task exactly; they answer a related
 question their query language can express. Every zero-shot run MUST therefore publish `relaxations.yaml`
-(`meds_algorithm_core.RelaxationLedger`) in a task-conditioned artifact. Three fields are required:
+(`meds_algorithm.RelaxationLedger`) in a task-conditioned artifact. Three fields are required:
 
 ```yaml
 query_language: MOTOR first-occurrence time-to-event over task-head codes   # required
@@ -211,7 +211,7 @@ semantics_digest: null | sha256:...  # TaskSpec digest for task-conditioned arti
 resources: {}
 ```
 
-`config_digest` is `meds_algorithm_core.digest_config` over the command's arguments plus any algorithm-owned
+`config_digest` is `meds_algorithm.digest_config` over the command's arguments plus any algorithm-owned
 settings it resolved (defaults, configuration files), so two artifacts made with the same configuration
 share it. `code` is recorded by `measured_artifact(..., repo=algorithm_root)` from the explicitly supplied algorithm
 checkout. The core installation path and current directory MUST NOT be used to infer algorithm identity.
@@ -288,10 +288,10 @@ portable pass/fail thresholds.
 - The algorithm-owned end-to-end adapters MUST identify the labels/evaluation index and evaluated splits so
   generic tests can compare requested and written prediction keys directly. `run_e2e` MUST also return the
   external inputs and integer fixture seed in `E2EResult.inputs`, and MUST apply
-  `meds_algorithm_core.conformance.signal.add_split_canaries` to its fixture and
+  `meds_algorithm.conformance.signal.add_split_canaries` to its fixture and
   return the canaries. `fitted_codes` MUST report every code the algorithm fitted a population statistic for,
   read from its artifacts.
-- `meds-algorithm-add-to-meds-dev` (`meds_algorithm_core.integrations.meds_dev.register`) installs `algorithms/<profile>/model.yaml` and
+- `meds-algorithm-add-to-meds-dev` (`meds_algorithm.integrations.meds_dev.register`) installs `algorithms/<profile>/model.yaml` and
   `requirements.txt`, with the repository as an editable requirement, into a MEDS-DEV checkout. A
   top-level `predicates.yaml` is copied as well when the repository has one. MEDS-DEV's own dataset
   predicates remain the default (section 2.3).

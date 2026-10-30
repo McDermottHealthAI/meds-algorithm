@@ -2,7 +2,7 @@
 
 Core owns profile interfaces, typed requests, artifact references, serialization and execution.
 Algorithm repositories own concrete algorithms, configurations, payloads and scientific compatibility.
-The [contract](src/meds_algorithm_core/CONTRACT.md) remains normative. These diagrams describe implemented
+The [contract](src/meds_algorithm/CONTRACT.md) remains normative. These diagrams describe implemented
 classes. This source is also packaged in the wheel and rendered by the template documentation.
 
 ## Profile hierarchy
@@ -159,7 +159,7 @@ Define configuration in the algorithm repository:
 
 ```python
 from dataclasses import dataclass
-from meds_algorithm_core import AlgorithmConfig
+from meds_algorithm import AlgorithmConfig
 
 
 @dataclass(frozen=True)
@@ -222,7 +222,7 @@ exact mapping and rounding. `capacity=2.0` does **not** universally mean twice t
 
 ```python
 from dataclasses import dataclass, replace
-from meds_algorithm_core import NNConfig
+from meds_algorithm import NNConfig
 
 
 @dataclass(frozen=True)

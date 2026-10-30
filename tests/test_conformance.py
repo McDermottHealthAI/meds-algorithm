@@ -4,7 +4,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from meds_algorithm_core import (
+from meds_algorithm import (
     ALGORITHM_PROFILES,
     STEP_SPECS,
     RelaxationLedger,
@@ -14,8 +14,8 @@ from meds_algorithm_core import (
     measured_artifact,
     read_index,
 )
-from meds_algorithm_core.conformance.end_to_end import assert_label_blind_pipeline, assert_profile_run
-from meds_algorithm_core.conformance.types import E2EResult
+from meds_algorithm.conformance.end_to_end import assert_label_blind_pipeline, assert_profile_run
+from meds_algorithm.conformance.types import E2EResult
 
 
 @pytest.fixture
@@ -117,7 +117,7 @@ def test_original_invalid_scores_fail_before_rerun(tmp_path, pipeline, probabili
 def test_sharded_predictions_and_separate_training_roots(tmp_path, pipeline):
     import shutil
 
-    from meds_algorithm_core.data.labels import read_targets
+    from meds_algorithm.data.labels import read_targets
 
     initial = pipeline(tmp_path / "setup", profile="supervised")
     training, index = tmp_path / "training", tmp_path / "index"

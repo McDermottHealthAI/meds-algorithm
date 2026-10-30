@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from meds_algorithm_core.conformance import meds_dev
-from meds_algorithm_core.integrations.meds_dev import register
+from meds_algorithm.conformance import meds_dev
+from meds_algorithm.integrations.meds_dev import register
 
 
 @pytest.mark.parametrize(

@@ -1,4 +1,4 @@
-# Releasing meds-algorithm-core
+# Releasing meds-algorithm
 
 Release validation has three stages: validate the distributions, rehearse delivery through TestPyPI,
 then verify installation from PyPI. Package validation does not replace scientific validation of
@@ -19,7 +19,7 @@ with `uv build` (the wheel is built from the source distribution). It also:
 Before the first index release, generate both a single-profile repository and a repository containing
 all six profiles from the template. Install their wheels with the candidate core distribution and
 run their registry and operational tests. Confirm that the generated wheel does not contain a copy
-of `meds_algorithm_core` or `meds_algorithm_contract`, and that the documentation builds with the installed
+of `meds_algorithm` or `meds_algorithm_contract`, and that the documentation builds with the installed
 contract. These checks validate template integration; generated algorithm methods are still skeletons.
 
 ## TestPyPI rehearsal
@@ -38,7 +38,7 @@ test_env=$(mktemp -d)
 uv venv "$test_env"
 uv pip install --python "$test_env/bin/python" 'pyyaml>=6'
 uv pip install --python "$test_env/bin/python" \
-  --index-url https://test.pypi.org/simple/ --no-deps 'meds-algorithm-core==0.3.0a3'
+  --index-url https://test.pypi.org/simple/ --no-deps 'meds-algorithm==0.4.0a4'
 "$test_env/bin/python" -I tests/wheel_smoke.py
 uv pip check --python "$test_env/bin/python"
 ```
@@ -60,9 +60,9 @@ TestPyPI separately, with the following proposed values when adding the release 
 
 | Field | PyPI | TestPyPI |
 | --- | --- | --- |
-| Project | `meds-algorithm-core` | `meds-algorithm-core` |
+| Project | `meds-algorithm` | `meds-algorithm` |
 | GitHub owner | `florian6973` | `florian6973` |
-| Repository | `meds-algorithm-core` | `meds-algorithm-core` |
+| Repository | `meds-algorithm` | `meds-algorithm` |
 | Workflow filename | `publish.yml` | `publish.yml` |
 | GitHub environment | `pypi` | `testpypi` |
 
@@ -73,6 +73,6 @@ See [PyPI's Trusted Publishing setup](https://docs.pypi.org/trusted-publishers/c
 and [publishing instructions](https://docs.pypi.org/trusted-publishers/using-a-publisher/).
 
 After publishing, repeat the clean-environment installation with the default PyPI index and the exact
-version, then switch the template's Git dependency to `meds-algorithm-core==<version>` (retaining its
+version, then switch the template's Git dependency to `meds-algorithm==<version>` (retaining its
 `conformance` extra where needed). Update the lockfile, rerun generated-project checks and rebuild the
 documentation preview. Alpha versions require an explicit version pin or prerelease selection.

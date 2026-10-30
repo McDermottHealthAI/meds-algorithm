@@ -5,7 +5,7 @@ import polars as pl
 import pytest
 import yaml
 
-from meds_algorithm_core import (
+from meds_algorithm import (
     AlgorithmConfig,
     ArtifactDestination,
     PayloadMetadata,
@@ -13,9 +13,9 @@ from meds_algorithm_core import (
     StepRunner,
     TaskSpec,
 )
-from meds_algorithm_core.artifacts.manifest import digest_file
-from meds_algorithm_core.data.predicates import compose_feature_predicates
-from meds_algorithm_core.requests import PredictionIndex, PredictOnlyRequest, PreprocessDataRequest
+from meds_algorithm.artifacts.manifest import digest_file
+from meds_algorithm.data.predicates import compose_feature_predicates
+from meds_algorithm.requests import PredictionIndex, PredictOnlyRequest, PreprocessDataRequest
 
 
 class Reader(PredictOnlyAlgorithm):

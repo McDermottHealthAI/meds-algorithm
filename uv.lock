@@ -79,8 +79,8 @@ wheels = [
 ]
 
 [[package]]
-name = "meds-algorithm-core"
-version = "0.4.0a3"
+name = "meds-algorithm"
+version = "0.4.0a4"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

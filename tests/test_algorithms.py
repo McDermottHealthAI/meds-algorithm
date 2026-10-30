@@ -10,7 +10,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from meds_algorithm_core import (
+from meds_algorithm import (
     AlgorithmConfig,
     AlgorithmRepository,
     ArtifactDestination,
@@ -25,8 +25,8 @@ from meds_algorithm_core import (
     ZeroShotMaterializedAlgorithm,
     read_manifest,
 )
-from meds_algorithm_core.algorithms import profile_classes, request_type
-from meds_algorithm_core.requests import (
+from meds_algorithm.algorithms import profile_classes, request_type
+from meds_algorithm.requests import (
     PredictionIndex,
     PredictSupervisedRequest,
     PreprocessDataRequest,
@@ -158,8 +158,8 @@ def test_reloaded_request_runs_in_a_fresh_process(prepared, tmp_path):
 import sys
 from pathlib import Path
 from test_algorithms import ToyAlgorithm, ToyConfig
-from meds_algorithm_core import StepRunner
-from meds_algorithm_core.requests import PredictSupervisedRequest
+from meds_algorithm import StepRunner
+from meds_algorithm.requests import PredictSupervisedRequest
 root = Path(sys.argv[1])
 StepRunner().run(ToyAlgorithm(ToyConfig.load(root / 'config.json')), 'predict_supervised',
     PredictSupervisedRequest.load(root / 'request.json'), profile='supervised')
@@ -231,7 +231,7 @@ def test_request_types_and_paths_cannot_cross_boundaries(prepared):
 
 
 def test_profile_requests_are_the_source_of_legacy_metadata():
-    from meds_algorithm_core import ALGORITHM_PROFILES, STEP_SPECS
+    from meds_algorithm import ALGORITHM_PROFILES, STEP_SPECS
 
     for profile in profile_classes():
         assert tuple(ALGORITHM_PROFILES[profile.profile]) == profile.steps
@@ -299,7 +299,7 @@ def test_version_four_rejects_old_artifact_and_argument_names(prepared):
 
 
 def test_predict_only_context_must_be_explicit_and_disjoint(prepared, tmp_path):
-    from meds_algorithm_core.requests import PredictionContext, PredictOnlyRequest
+    from meds_algorithm.requests import PredictionContext, PredictOnlyRequest
 
     runner, original = prepared
     request = PredictOnlyRequest(
@@ -374,7 +374,7 @@ class AllProfiles(
                 pl.lit(0.5).alias("predicted_boolean_probability")
             ).write_parquet(request.output.directory / "predictions.parquet")
             if getattr(request, "task", None) is not None:
-                from meds_algorithm_core import RelaxationLedger
+                from meds_algorithm import RelaxationLedger
 
                 RelaxationLedger("toy", "probability", True).write(request.output.directory)
         else:
@@ -398,7 +398,7 @@ class AllProfiles(
 
 @pytest.mark.parametrize("profile", [cls.profile for cls in profile_classes()])
 def test_every_profile_runs_through_typed_cli_adapter(profile, tmp_path):
-    from meds_algorithm_core import STEP_SPECS
+    from meds_algorithm import STEP_SPECS
 
     inputs = tmp_path / "inputs"
     inputs.mkdir()
