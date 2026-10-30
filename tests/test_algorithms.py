@@ -1,5 +1,6 @@
 """Public runner tests, strict config round trips and restartable profile execution."""
 
+import json
 import os
 import subprocess
 import sys
@@ -64,7 +65,7 @@ class ToyAlgorithm(SupervisedAlgorithm):
         return PayloadMetadata("toy-algorithm")
 
     def predict_supervised(self, request):
-        probability = float((request.algorithm.directory / "probability.txt").read_text())
+        probability = float((request.fitted_algorithm.directory / "probability.txt").read_text())
         frame = request.index.read().with_columns(pl.lit(probability).alias("predicted_boolean_probability"))
         frame.write_parquet(request.output.directory / "predictions.parquet")
         return PayloadMetadata("toy-predictions")
@@ -97,7 +98,7 @@ def prepared(tmp_path):
     )
     request = PredictSupervisedRequest(
         data=data,
-        algorithm=algorithm,
+        fitted_algorithm=algorithm,
         index=PredictionIndex(labels, ("held_out",)),
         output=ArtifactDestination(tmp_path / "predictions"),
     )
@@ -137,15 +138,17 @@ def test_runner_publishes_resolved_config_and_request(prepared):
     assert "boolean_value" in pl.read_parquet(result.directory / "predictions.parquet").columns
 
 
-def test_absent_optional_predicates_field_in_recorded_config_means_none(prepared):
+def test_incomplete_recorded_configuration_is_rejected(prepared):
     import yaml
 
     runner, request = prepared
-    path = request.algorithm.directory / "manifest.yaml"
-    manifest = read_manifest(request.algorithm.directory)
+    path = request.fitted_algorithm.directory / "manifest.yaml"
+    manifest = read_manifest(request.fitted_algorithm.directory)
     del manifest["algorithm"]["config"]["additional_predicates_file"]
     path.write_text(yaml.safe_dump(manifest))
-    runner.run(ToyAlgorithm(), "predict_supervised", request, profile="supervised")
+    with pytest.raises(ValueError, match="configuration mismatch"):
+        runner.run(ToyAlgorithm(), "predict_supervised", request, profile="supervised")
+    assert not request.output.directory.exists()
 
 
 def test_reloaded_request_runs_in_a_fresh_process(prepared, tmp_path):
@@ -217,7 +220,7 @@ def test_request_types_and_paths_cannot_cross_boundaries(prepared):
         )
     arguments = {
         "input_data_dir": str(request.data.directory),
-        "input_supervised_algorithm_dir": str(request.algorithm.directory),
+        "input_supervised_algorithm_dir": str(request.fitted_algorithm.directory),
         "external_index_dir": str(request.index.directory),
         "splits": ["held_out"],
         "output_predictions_dir": str(request.output.directory),
@@ -230,7 +233,7 @@ def test_request_types_and_paths_cannot_cross_boundaries(prepared):
     assert result.directory == request.output.directory
 
 
-def test_profile_requests_are_the_source_of_legacy_metadata():
+def test_profile_requests_are_the_source_of_step_metadata():
     from meds_algorithm import ALGORITHM_PROFILES, STEP_SPECS
 
     for profile in profile_classes():
@@ -272,25 +275,25 @@ def test_version_four_rejects_old_artifact_and_argument_names(prepared):
     import yaml
 
     _, request = prepared
-    assert "algorithm" in request.to_dict() and "model" not in request.to_dict()
-    path = request.algorithm.directory / "manifest.yaml"
-    manifest = read_manifest(request.algorithm.directory)
+    assert "fitted_algorithm" in request.to_dict() and "algorithm" not in request.to_dict()
+    path = request.fitted_algorithm.directory / "manifest.yaml"
+    manifest = read_manifest(request.fitted_algorithm.directory)
     assert manifest["contract_version"] == "4"
     assert manifest["artifact"]["type"] == "supervised_algorithm"
     manifest["contract_version"] = "3"
     path.write_text(yaml.safe_dump(manifest))
     with pytest.raises(ValueError, match="version 4"):
-        read_manifest(request.algorithm.directory)
+        read_manifest(request.fitted_algorithm.directory)
     manifest["contract_version"] = "4"
     manifest["artifact"]["type"] = "supervised_model"
     path.write_text(yaml.safe_dump(manifest))
     with pytest.raises(ValueError, match="artifact type"):
-        read_manifest(request.algorithm.directory)
+        read_manifest(request.fitted_algorithm.directory)
     with pytest.raises(ValueError, match="Unknown or forbidden"):
         PredictSupervisedRequest.from_arguments(
             {
                 "input_data_dir": request.data.directory,
-                "input_supervised_model_dir": request.algorithm.directory,
+                "input_supervised_model_dir": request.fitted_algorithm.directory,
                 "external_index_dir": request.index.directory,
                 "splits": request.index.splits,
                 "output_predictions_dir": request.output.directory,
@@ -421,3 +424,48 @@ def test_every_profile_runs_through_typed_cli_adapter(profile, tmp_path):
         result = repository.run(step, arguments)
         artifacts[result.kind] = result
         assert read_manifest(result.directory)["command"]["name"] == step
+
+
+@pytest.mark.parametrize(
+    "profile,step",
+    [
+        ("supervised", "predict_supervised"),
+        ("finetune", "predict_finetune"),
+        ("probe", "predict_probe"),
+    ],
+)
+def test_fitted_request_schema_rejects_old_envelopes_and_field_names(profile, step, tmp_path):
+    request_class = request_type(profile, step)
+    arguments = {
+        "input_embeddings_dir" if profile == "probe" else "input_data_dir": tmp_path / "data",
+        {
+            "supervised": "input_supervised_algorithm_dir",
+            "finetune": "input_finetuned_algorithm_dir",
+            "probe": "input_probe_algorithm_dir",
+        }[profile]: tmp_path / "fitted",
+        "external_index_dir": tmp_path / "index",
+        "splits": ["held_out"],
+        "output_predictions_dir": tmp_path / "predictions",
+    }
+    request = request_class.from_arguments(arguments)
+    assert request.fitted_algorithm.directory == tmp_path / "fitted"
+    path = request.save(tmp_path / "request.json")
+    assert request_class.load(path) == request
+    envelope = json.loads(path.read_text())
+    assert envelope["schema_version"] == 2
+    envelope["schema_version"] = 1
+    envelope["values"]["algorithm"] = envelope["values"].pop("fitted_algorithm")
+    path.write_text(json.dumps(envelope))
+    with pytest.raises(ValueError, match="schema version mismatch"):
+        request_class.load(path)
+    with pytest.raises(ValueError, match="Unknown fields"):
+        request_class.from_dict(envelope["values"])
+
+
+def test_removed_dispatchers_are_not_public_execution_paths():
+    import meds_algorithm
+    from meds_algorithm.contracts import commands
+
+    for name in ("Command", "LegacyAlgorithmRepository"):
+        assert not hasattr(meds_algorithm, name)
+        assert not hasattr(commands, name)

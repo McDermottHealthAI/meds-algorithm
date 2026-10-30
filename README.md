@@ -1,7 +1,7 @@
 # meds-algorithm
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![PyPI: unreleased](https://img.shields.io/badge/PyPI-unreleased-lightgrey)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/RELEASING.md)
+[![PyPI](https://img.shields.io/pypi/v/meds-algorithm)](https://pypi.org/project/meds-algorithm/)
 [![Tests and code quality](https://github.com/McDermottHealthAI/meds-algorithm/actions/workflows/ci.yml/badge.svg)](https://github.com/McDermottHealthAI/meds-algorithm/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/docs-architecture-blue)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md)
 [![Contributors](https://img.shields.io/github/contributors/McDermottHealthAI/meds-algorithm)](https://github.com/McDermottHealthAI/meds-algorithm/graphs/contributors)
@@ -29,7 +29,7 @@ src/meds_algorithm/
 ├── configuration.py            # AlgorithmConfig, NNConfig and execution options
 ├── serialization.py            # strict, versioned config/request JSON serialization
 ├── runner.py                   # validate, execute, measure, publish; CLI adapter
-├── contracts/commands.py       # derived compatibility views and legacy dispatch
+├── contracts/commands.py       # derived step specifications and validation
 ├── artifacts/
 │   ├── references.py           # lazy typed artifact references and payload metadata
 │   ├── manifest.py             # measured artifacts, envelope reading and digests
@@ -50,9 +50,8 @@ src/meds_algorithm/
 
 ## Installation and dependencies
 
-Install a reviewed revision with
-`pip install 'meds-algorithm @ git+https://github.com/McDermottHealthAI/meds-algorithm.git@<full-commit-sha>'`.
-The template currently records the exact SHA. For package-index release checks and publishing setup,
+Install from PyPI with `pip install 'meds-algorithm[data]'`. Pin a released version in algorithm
+repositories for reproducible environments. For package-index release checks and publishing setup,
 see the [release guide](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/RELEASING.md).
 
 - Base package: PyYAML; no dataframe engine, test runner, GPU or algorithm framework is imported by base APIs.
@@ -91,8 +90,7 @@ layout into that interface; these upstream names are not part of this package's 
 
 ## Publication, provenance and measurement
 
-Pass the algorithm checkout explicitly to `StepRunner(repo=algorithm_root)` or, for legacy implementations,
-`measured_artifact(..., repo=algorithm_root)`. The package never
+Pass the algorithm checkout explicitly to `StepRunner(repo=algorithm_root)`. The package never
 infers the algorithm from its own installation path or the working directory. Without a supplied checkout,
 commit and dirty state are unknown (`null`); wheel deployments must retain algorithm build provenance
 separately rather than inventing a checkout revision.
@@ -111,6 +109,8 @@ On platforms without `/proc`, use process-only `getrusage` when available; other
 values as `null`. GPU instrumentation remains the algorithm/framework's responsibility.
 
 ## Validation
+
+See [the test catalogue](src/meds_algorithm/TESTING.md) for what each test checks, why it exists, and the limits of the suite.
 
 ```bash
 uv sync --extra test --group dev
@@ -131,6 +131,16 @@ MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selectio
 training. Keep each algorithm's data-access and cluster approval rules in its own repository.
 
 ## Changes
+
+### 0.4.0a5 (unreleased)
+
+- Remove `Command` and `LegacyAlgorithmRepository`; all algorithm execution uses typed profiles and the runner.
+- Rename fitted prediction request fields to `fitted_algorithm` and bump those request schemas to 2.
+  External CLI argument names stay unchanged. Old request envelopes require explicit migration.
+- Require complete recorded fitted-input configuration instead of filling missing historical fields.
+- Expose `StepSpec.from_request_type` as the typed specification factory.
+- Separate configuration, every concrete request type, artifacts and execution in the UML guide;
+  include the per-test catalogue in the installed package.
 
 ### 0.4.0a4
 

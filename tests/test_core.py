@@ -5,7 +5,7 @@ import pytest
 
 from meds_algorithm.contracts.commands import STEP_SPECS, CommandName
 from meds_algorithm.data.index import read_index, split_files
-from meds_algorithm.spec import specification
+from meds_algorithm.spec import specification, validation_guide
 
 
 def labelled_file(path, subject=1):
@@ -82,6 +82,7 @@ def test_specification_is_an_installed_package_resource():
     assert "# MEDS Algorithm Repository Contract, version 4" in spec
     assert "Ground-truth target values the algorithm may use" in spec
     assert "external_index_dir" in spec
+    assert "test_index_reader_projects_keys_at_io_boundary" in validation_guide()
 
 
 def test_conflicting_split_names_never_select_evaluation_as_training(tmp_path):

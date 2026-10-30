@@ -66,15 +66,27 @@ classDiagram
 Each profile class declares its `profile` and ordered `steps`; method annotations identify request
 types. Request fields define CLI arguments, while each request declares its output argument and
 result artifact class. There is no independent step-definition registry. `ALGORITHM_PROFILES` and
-`STEP_SPECS` are read-only, derived compatibility views for existing consumers.
+`STEP_SPECS` are read-only views derived from these classes. `StepSpec.from_request_type` constructs
+a specification for manifest validation and command inspection without maintaining a second definition.
 
-## Requests, configuration and artifacts
+## Algorithm configuration
+
+Configuration answers **how this algorithm behaves**. A request answers **what one invocation reads
+and writes**. An artifact reference identifies **persisted data or fitted state**. These are separate
+objects; sharing serialization does not make them one hierarchy.
+
+The algorithm instance owns its configuration. Hyperparameters belong here, not in step requests.
+`ExecutionOptions` belongs to each request and holds the invocation's seed and overwrite policy.
 
 ```mermaid
 classDiagram
+    class Algorithm {
+        <<abstract>>
+        config: AlgorithmConfig
+    }
     class AlgorithmConfig {
         <<frozen dataclass>>
-        additional_predicates_file
+        additional_predicates_file: Path optional
         validate()
         from_dict(values)
         from_file(path)
@@ -87,73 +99,21 @@ classDiagram
     }
     class NNConfig {
         <<frozen dataclass>>
-        capacity
-        learning_rate
-        batch_size
-        weight_decay
-        dropout
+        capacity: float
+        learning_rate: float
+        batch_size: int
+        weight_decay: float
+        dropout: float
     }
     class AlgorithmOwnedNNConfig {
         <<frozen dataclass>>
         architecture-specific defaults and settings
     }
-    class StepRequest {
-        <<frozen dataclass>>
-        output
-        execution
-        predicates_file
-        from_arguments(arguments)
-        save(path)
-        load(path)
-    }
-    class PredictSupervisedRequest {
-        data
-        algorithm
-        index
-    }
-    class ArtifactReference {
-        <<frozen dataclass>>
-        directory
-        kind
-        open(directory)
-        read_manifest()
-    }
-    class PreparedDataArtifact
-    class SupervisedAlgorithmArtifact
-    class PredictionsArtifact
-    class PredictionIndex {
-        directory
-        splits
-        read()
-    }
-    class ArtifactDestination {
-        directory
-    }
-    class ExecutionOptions {
-        seed
-        overwrite
-    }
+    Algorithm --> AlgorithmConfig : config
     AlgorithmConfig <|-- AlgorithmOwnedConfig
     AlgorithmConfig <|-- NNConfig
     NNConfig <|-- AlgorithmOwnedNNConfig
-    StepRequest <|-- PredictSupervisedRequest
-    ArtifactReference <|-- PreparedDataArtifact
-    ArtifactReference <|-- SupervisedAlgorithmArtifact
-    ArtifactReference <|-- PredictionsArtifact
-    PredictSupervisedRequest --> PreparedDataArtifact : data
-    PredictSupervisedRequest --> SupervisedAlgorithmArtifact : algorithm
-    PredictSupervisedRequest --> PredictionIndex : index
-    StepRequest --> ArtifactDestination : output
-    StepRequest --> ExecutionOptions : execution
 ```
-
-Artifact constructors normalize paths without loading payloads. `open`/`read_manifest` validate the
-common envelope and artifact type. The runner validates references before algorithm code. Payload readers
-remain algorithm-owned; core imposes no tensor, tokenizer, batching or dataframe representation.
-
-`TrainingLabels.read` accepts only train/tuning. `PredictionIndex.read` projects keys at the I/O boundary.
-`PredictionContext` explicitly selects train/tuning and checks overlap with evaluated keys. Zero-shot
-requests carry `TaskSpec`. These interfaces make permissions clear; they are not a filesystem sandbox.
 
 Define configuration in the algorithm repository:
 
@@ -304,6 +264,233 @@ interface covers configuration and its existing persisted provenance; it does no
 or count network parameters. Avoid adding another dataset-selection configuration until its upstream
 owner and identity format are agreed.
 
+## Step requests: typed method parameters
+
+A request is an immutable **parameter object** for one method call. Its concrete type defines the
+required inputs, optional inputs and output destination. The children represent different operations;
+a preprocessing request does not turn into a training request. Every method has a concrete annotation,
+for example `predict_supervised(request: PredictSupervisedRequest) -> PayloadMetadata`.
+
+`StepRequest` supplies these common fields and methods to **all 13 concrete requests**:
+
+```mermaid
+classDiagram
+    class StepRequest {
+        <<frozen dataclass>>
+        output: ArtifactDestination
+        execution: ExecutionOptions
+        predicates_file: Path optional
+        from_arguments(arguments)
+        artifact_inputs()
+        save(path)
+        load(path)
+    }
+    class ArtifactDestination {
+        directory: Path
+    }
+    class ExecutionOptions {
+        seed: int = 0
+        overwrite: bool = false
+    }
+    StepRequest --> ArtifactDestination : output
+    StepRequest --> ExecutionOptions : execution
+```
+
+Callers instantiate concrete requests. `output_argument` and `result_type` are class metadata used to
+map CLI arguments and construct the resulting artifact reference; they are not caller-supplied fields.
+The following diagrams show every concrete request, split for readability. Each inherits the common
+fields above. Relationships are inheritance (hollow arrow) or references to other objects (plain arrow).
+
+### Preprocessing and training requests
+
+```mermaid
+classDiagram
+    StepRequest <|-- PreprocessDataRequest
+    StepRequest <|-- PretrainRequest
+    StepRequest <|-- TrainSupervisedRequest
+    StepRequest <|-- TrainFinetuneRequest
+    StepRequest <|-- TrainProbeRequest
+    class PreprocessDataRequest {
+        meds_dir: Path
+        result_type: PreparedDataArtifact
+    }
+    class PretrainRequest {
+        data: PreparedDataArtifact
+        result_type: PretrainedAlgorithmArtifact
+    }
+    class TrainSupervisedRequest {
+        data: PreparedDataArtifact
+        labels: TrainingLabels
+        result_type: SupervisedAlgorithmArtifact
+    }
+    class TrainFinetuneRequest {
+        data: PreparedDataArtifact
+        pretrained: PretrainedAlgorithmArtifact
+        labels: TrainingLabels
+        result_type: FinetunedAlgorithmArtifact
+    }
+    class TrainProbeRequest {
+        embeddings: EmbeddingsArtifact
+        labels: TrainingLabels
+        result_type: ProbeAlgorithmArtifact
+    }
+```
+
+### Embedding inference and fitted prediction requests
+
+```mermaid
+classDiagram
+    StepRequest <|-- InferEmbeddingsRequest
+    StepRequest <|-- PredictSupervisedRequest
+    StepRequest <|-- PredictFinetuneRequest
+    StepRequest <|-- PredictProbeRequest
+    class InferEmbeddingsRequest {
+        data: PreparedDataArtifact
+        pretrained: PretrainedAlgorithmArtifact
+        index: PredictionIndex
+        result_type: EmbeddingsArtifact
+    }
+    class PredictSupervisedRequest {
+        data: PreparedDataArtifact
+        fitted_algorithm: SupervisedAlgorithmArtifact
+        index: PredictionIndex
+        result_type: PredictionsArtifact
+    }
+    class PredictFinetuneRequest {
+        data: PreparedDataArtifact
+        fitted_algorithm: FinetunedAlgorithmArtifact
+        index: PredictionIndex
+        result_type: PredictionsArtifact
+    }
+    class PredictProbeRequest {
+        embeddings: EmbeddingsArtifact
+        fitted_algorithm: ProbeAlgorithmArtifact
+        index: PredictionIndex
+        result_type: PredictionsArtifact
+    }
+```
+
+`fitted_algorithm` references saved fitted state; it is not the Python algorithm instance. The CLI
+names remain `input_supervised_algorithm_dir`, `input_finetuned_algorithm_dir` and
+`input_probe_algorithm_dir`. These three requests use serialization schema version 2; version 1
+request envelopes with the old `algorithm` field are rejected rather than silently reinterpreted.
+
+### Trajectory inference, zero-shot and predict-only requests
+
+```mermaid
+classDiagram
+    StepRequest <|-- InferTrajectoriesRequest
+    StepRequest <|-- PredictZeroShotDirectRequest
+    StepRequest <|-- PredictZeroShotMaterializedRequest
+    StepRequest <|-- PredictOnlyRequest
+    class InferTrajectoriesRequest {
+        data: PreparedDataArtifact
+        pretrained: PretrainedAlgorithmArtifact
+        index: PredictionIndex
+        result_type: TrajectoriesArtifact
+    }
+    class PredictZeroShotDirectRequest {
+        data: PreparedDataArtifact
+        pretrained: PretrainedAlgorithmArtifact
+        index: PredictionIndex
+        task: TaskSpec
+        result_type: PredictionsArtifact
+    }
+    class PredictZeroShotMaterializedRequest {
+        data: PreparedDataArtifact
+        trajectories: TrajectoriesArtifact
+        meds_dir: Path
+        index: PredictionIndex
+        task: TaskSpec
+        result_type: PredictionsArtifact
+    }
+    class PredictOnlyRequest {
+        data: PreparedDataArtifact
+        index: PredictionIndex
+        context: PredictionContext optional
+        task: TaskSpec optional
+        result_type: PredictionsArtifact
+    }
+```
+
+`TrainingLabels.read` accepts only train/tuning. `PredictionIndex.read` projects keys at the I/O boundary.
+`PredictionContext` explicitly selects train/tuning and checks overlap with evaluated keys. Zero-shot
+requests carry `TaskSpec`. These interfaces make permitted inputs clear; they are not a filesystem sandbox.
+All requests inherit optional `predicates_file`; preprocessing uses feature predicates and zero-shot
+prediction uses task predicates. Inference has no training-label field. Evaluation truth is a runner-only
+argument and never enters a prediction request.
+
+### Constructing and executing a request
+
+Given an implemented `MyAlgorithm(SupervisedAlgorithm)` and its `MyAlgorithmConfig`, a caller uses:
+
+```python
+from pathlib import Path
+from meds_algorithm import (
+    ArtifactDestination,
+    PreparedDataArtifact,
+    StepRunner,
+    SupervisedAlgorithmArtifact,
+)
+from meds_algorithm.requests import PredictionIndex, PredictSupervisedRequest
+
+algorithm = MyAlgorithm(MyAlgorithmConfig())  # implementation and its hyperparameters
+request = PredictSupervisedRequest(
+    data=PreparedDataArtifact(Path("prepared")),
+    fitted_algorithm=SupervisedAlgorithmArtifact(Path("trained")),
+    index=PredictionIndex(Path("index"), ("held_out",)),
+    output=ArtifactDestination(Path("predictions")),
+)
+predictions = StepRunner().run(
+    algorithm,
+    "predict_supervised",
+    request,
+    profile="supervised",
+)
+```
+
+Required keyword fields, type validation and semantic checks make the method boundary explicit. Frozen
+requests cannot be modified in place. The runner substitutes a private staging destination in a copy;
+the algorithm writes to `request.output.directory`. Configuration remains on `algorithm.config`.
+Both objects are persisted separately as `config.json` and `request.json` for reproducibility.
+
+## Artifact references and outputs
+
+Artifacts are persisted results shared between independent invocations. References identify their
+directory and expected kind; they do not hold a loaded neural network or preprocessing payload.
+
+```mermaid
+classDiagram
+    class ArtifactReference {
+        <<frozen dataclass>>
+        directory: Path
+        kind: ArtifactType
+        open(directory)
+        read_manifest()
+    }
+    ArtifactReference <|-- PreparedDataArtifact
+    ArtifactReference <|-- PretrainedAlgorithmArtifact
+    ArtifactReference <|-- SupervisedAlgorithmArtifact
+    ArtifactReference <|-- FinetunedAlgorithmArtifact
+    ArtifactReference <|-- ProbeAlgorithmArtifact
+    ArtifactReference <|-- EmbeddingsArtifact
+    ArtifactReference <|-- TrajectoriesArtifact
+    ArtifactReference <|-- PredictionsArtifact
+    class PayloadMetadata {
+        format: str
+        version: int = 1
+    }
+    PredictSupervisedRequest --> PreparedDataArtifact : data
+    PredictSupervisedRequest --> SupervisedAlgorithmArtifact : fitted_algorithm
+    PredictSupervisedRequest --> PredictionIndex : index
+```
+
+Constructors normalize paths without loading payloads. `open`/`read_manifest` validate the common
+envelope and artifact type. The runner validates references before algorithm code. Payload readers
+remain algorithm-owned; core imposes no tensor, tokenizer, batching or dataframe representation.
+Methods return `PayloadMetadata` describing what they wrote. The runner returns the published typed
+artifact reference; metadata and the reference are different objects.
+
 ## Shared execution
 
 `AlgorithmRepository` associates profile names with implementation classes, creates a fresh instance
@@ -338,7 +525,7 @@ sequenceDiagram
 Algorithm methods write payloads only into `request.output.directory` and return `PayloadMetadata`. They
 must not write the reserved `manifest.yaml`, `config.json` or `request.json`, or publish final directories.
 Directly calling algorithm methods bypasses runner validation/publication; production and test adapters
-must use the runner. Low-level publication helpers remain available for legacy implementations.
+must use the runner. The runner uses low-level publication helpers internally.
 
 Prediction payloads are Parquet shards with keys and probabilities, without ground truth. The runner
 validates their combined key set and probabilities, then optionally attaches evaluation labels. That
@@ -369,8 +556,20 @@ Replaying evaluation additionally requires the runner-only label path recorded i
 | Template | Algorithm/config stubs, CLI, profile YAML, test adapters and operational files |
 | Algorithm repository | Concrete typed config, algorithms/components, payload formats, compatibility and scientific tests |
 
-Legacy `Command`/`LegacyAlgorithmRepository` retain their previous mapping-based behavior. They do not acquire
-the runner's stronger validation/publication automatically. New generated repositories use
-`AlgorithmRepository`. Contract version 4 uses algorithm-named package imports, CLI entry points,
-artifact types and input/output arguments. Version 3 artifacts and serialized types are not accepted
-under the new names by changing a version field. Existing repositories require an explicit migration.
+`AlgorithmRepository` is the only repository dispatcher. It constructs typed requests and delegates
+to `StepRunner`; the former mapping-based command dispatcher has been removed. Fitted inputs must
+record the complete resolved configuration; the default validator does not fill missing historical fields.
+Contract version 4 uses algorithm-named package imports, CLI entry points, artifact types and arguments.
+Existing repositories and incompatible serialized requests require an explicit migration.
+
+## Classes and functional helpers
+
+Objects own meaningful responsibilities: algorithms own configuration and implementation methods,
+requests own typed invocation parameters, references own artifact identity, and the runner owns execution.
+`StepSpec.from_request_type` is a class factory because its purpose is to construct a specification.
+
+Small stateless operations such as file hashing, encoding/decoding and conformance assertions remain
+functions. `staged_directory` and `measured_artifact` are context managers: their local state exists only
+between entry and exit, with cleanup and rollback on failure. A class wrapping these functions would
+not improve their current lifecycle. `_ProcessTreeMemorySampler` is a class because it manages a
+background sampler with start/stop state. The design does not require every function to become a method.

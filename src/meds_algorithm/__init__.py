@@ -32,9 +32,7 @@ from .contracts.commands import (
     ZERO_SHOT_TASK_COMMANDS,
     ArtifactInput,
     ArtifactType,
-    Command,
     CommandName,
-    LegacyAlgorithmRepository,
     StepSpec,
 )
 from .data.index import read_index, split_files
@@ -56,13 +54,11 @@ __all__ = [
     "ArtifactInput",
     "ArtifactReference",
     "ArtifactType",
-    "Command",
     "CommandName",
     "EmbeddingsArtifact",
     "ExecutionOptions",
     "FinetuneAlgorithm",
     "FinetunedAlgorithmArtifact",
-    "LegacyAlgorithmRepository",
     "NNConfig",
     "PayloadMetadata",
     "PredictOnlyAlgorithm",
