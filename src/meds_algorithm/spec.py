@@ -13,6 +13,11 @@ def architecture() -> str:
     return files("meds_algorithm").joinpath("ARCHITECTURE.md").read_text(encoding="utf-8")
 
 
+def validation_guide() -> str:
+    """Read the bundled test catalogue and validation guide."""
+    return files("meds_algorithm").joinpath("TESTING.md").read_text(encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()

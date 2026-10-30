@@ -197,8 +197,11 @@ class TrainProbeRequest(StepRequest):
 
 @dataclass(frozen=True, kw_only=True)
 class PredictSupervisedRequest(StepRequest):
+    schema_version = 2
     data: PreparedDataArtifact = field(metadata={"argument": "input_data_dir"})
-    algorithm: SupervisedAlgorithmArtifact = field(metadata={"argument": "input_supervised_algorithm_dir"})
+    fitted_algorithm: SupervisedAlgorithmArtifact = field(
+        metadata={"argument": "input_supervised_algorithm_dir"}
+    )
     index: PredictionIndex
     output_argument = "output_predictions_dir"
     result_type = PredictionsArtifact
@@ -206,8 +209,11 @@ class PredictSupervisedRequest(StepRequest):
 
 @dataclass(frozen=True, kw_only=True)
 class PredictFinetuneRequest(StepRequest):
+    schema_version = 2
     data: PreparedDataArtifact = field(metadata={"argument": "input_data_dir"})
-    algorithm: FinetunedAlgorithmArtifact = field(metadata={"argument": "input_finetuned_algorithm_dir"})
+    fitted_algorithm: FinetunedAlgorithmArtifact = field(
+        metadata={"argument": "input_finetuned_algorithm_dir"}
+    )
     index: PredictionIndex
     output_argument = "output_predictions_dir"
     result_type = PredictionsArtifact
@@ -215,8 +221,9 @@ class PredictFinetuneRequest(StepRequest):
 
 @dataclass(frozen=True, kw_only=True)
 class PredictProbeRequest(StepRequest):
+    schema_version = 2
     embeddings: EmbeddingsArtifact = field(metadata={"argument": "input_embeddings_dir"})
-    algorithm: ProbeAlgorithmArtifact = field(metadata={"argument": "input_probe_algorithm_dir"})
+    fitted_algorithm: ProbeAlgorithmArtifact = field(metadata={"argument": "input_probe_algorithm_dir"})
     index: PredictionIndex
     output_argument = "output_predictions_dir"
     result_type = PredictionsArtifact

@@ -145,8 +145,9 @@ training command. Fixed published algorithms and in-context learners can both us
 MUST come only from explicitly declared train/tuning splits disjoint from evaluated splits; there is no
 persistent task-head training hidden in this profile.
 
-The required Python boundary consists of `Command`, `CommandName`, `ArtifactType`, `ArtifactInput`,
-`StepSpec`, `STEP_SPECS`, and `LegacyAlgorithmRepository`. Their signatures and the detailed per-step software
+The required Python boundary consists of `Algorithm` profile interfaces, `AlgorithmConfig`, concrete
+`StepRequest` types, artifact references, `AlgorithmRepository` and `StepRunner`. `StepSpec` and
+`STEP_SPECS` are derived inspection/validation views, not another execution interface. Their signatures and the detailed per-step software
 requirements are specified in section 9 below. Implementations MUST meet
 those requirements even when their backend is an external process. Framework internals are algorithm-owned.
 
@@ -389,11 +390,12 @@ override `validate()` MUST call `super().validate()` to preserve inherited const
 and architecture-specific settings belong in the concrete algorithm configuration.
 The shared configuration does not select training cohorts or implement a scaling-law experiment runner.
 
-`Command.run(mapping) -> Path` and `LegacyAlgorithmRepository` provide mapping-based dispatch after an
-explicit naming migration. Their validation is limited to interface shapes and routing; they do not gain the
-typed runner's guarantees automatically. New generated algorithms use typed profile classes. The external
-CLI step names remain unchanged, but contract version 4 renames package imports, entry points, artifact
-types and input/output arguments to algorithm terminology. This does not migrate existing repositories.
+`AlgorithmRepository` is the sole dispatcher and delegates all execution to `StepRunner`. There is no
+mapping-based `Command` execution interface or legacy repository dispatcher. Fitted artifact inputs
+must record the complete resolved configuration unless the implementation explicitly overrides the
+compatibility policy. The Python fields for saved supervised, finetuned and probe state are named
+`fitted_algorithm`; their external `input_*_algorithm_dir` arguments are unchanged. The three affected
+prediction request types use serialization schema version 2 and reject old version 1 envelopes.
 
 ### Step arguments and artifacts
 
