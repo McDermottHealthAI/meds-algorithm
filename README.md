@@ -18,7 +18,7 @@ src/meds_algorithm_core/
 ├── spec.py                     # installed specification reader
 ├── algorithms.py               # Algorithm and profile ABCs, lifecycle order
 ├── requests.py                 # frozen per-step requests and CLI field mappings
-├── configuration.py            # AlgorithmConfig, NNConfig/NNCapacity and execution options
+├── configuration.py            # AlgorithmConfig, NNConfig and execution options
 ├── serialization.py            # strict, versioned config/request JSON serialization
 ├── runner.py                   # validate, execute, measure, publish; CLI adapter
 ├── contracts/commands.py       # derived compatibility views and legacy dispatch
@@ -61,8 +61,8 @@ hyperparameters, defaults and validation. Use `config_file=...` for a JSON/YAML 
 previously saved `config.json`. Typed prediction execution requires the `data` extra. See the
 [architecture guide](ARCHITECTURE.md) for the complete ownership and serialization algorithm.
 
-Neural algorithms can extend `NNConfig` for typed capacity dimensions, learning rate, batch size,
-weight decay and dropout. Concrete algorithms define architecture-specific dimensions and training
+Neural algorithms can extend `NNConfig` for a capacity multiplier, learning rate, batch size,
+weight decay and dropout. Concrete algorithms define the multiplier-to-architecture mapping and training
 defaults. See [neural configuration and scaling](ARCHITECTURE.md#neural-network-configuration-and-scaling-experiments)
 for an extensible example and the recommended upstream ownership of data scaling.
 
@@ -126,7 +126,7 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ### 0.4.0a3
 
-- Add optional `NNConfig(AlgorithmConfig)` and extensible `NNCapacity` with strict immutable settings,
+- Add optional `NNConfig(AlgorithmConfig)` with a scalar capacity multiplier and strict immutable settings,
   inherited serialization, validation and runner provenance, without neural-framework dependencies.
 - Document capacity semantics, configuration sweeps and the distinction between implemented configuration
   and future upstream data-scaling/consumption-reporting integrations.

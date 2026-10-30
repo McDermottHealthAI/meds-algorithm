@@ -93,11 +93,6 @@ classDiagram
         weight_decay
         dropout
     }
-    class NNCapacity {
-        <<frozen dataclass>>
-        width
-        depth
-    }
     class AlgorithmOwnedNNConfig {
         <<frozen dataclass>>
         architecture-specific defaults and settings
@@ -141,7 +136,6 @@ classDiagram
     AlgorithmConfig <|-- AlgorithmOwnedConfig
     AlgorithmConfig <|-- NNConfig
     NNConfig <|-- AlgorithmOwnedNNConfig
-    NNConfig *-- NNCapacity : capacity
     StepRequest <|-- PredictSupervisedRequest
     ArtifactReference <|-- PreparedDataArtifact
     ArtifactReference <|-- SupervisedAlgorithmArtifact
@@ -205,74 +199,82 @@ not a neural network, optimizer or training loop. Classical algorithms continue 
 
 | Setting | Meaning and validation |
 |---|---|
-| `capacity.width` | Positive integer architecture width; the algorithm documents the exact dimension |
-| `capacity.depth` | Positive integer architecture depth; the algorithm documents which layers are counted |
+| `capacity` | Positive finite multiplier relative to the algorithm's reference architecture; defaults to `1.0` |
 | `learning_rate` | Positive finite base optimizer learning rate, before scheduling |
 | `batch_size` | Positive integer examples per device per microbatch, before gradient accumulation |
 | `weight_decay` | Nonnegative finite weight-decay coefficient; defaults to zero |
 | `dropout` | Finite probability of dropping a unit, in `[0, 1)`; defaults to zero |
 
-Core deliberately supplies no default width, depth, learning rate or batch size. A concrete algorithm
-supplies source-defined defaults, chooses its optimizer and scheduler, and specifies which parameter
+Core deliberately supplies no default learning rate or batch size. A concrete algorithm defines its
+reference architecture and multiplier-to-dimensions mapping, supplies source-defined defaults, chooses
+its optimizer and scheduler, and specifies which parameter
 groups receive weight decay and where dropout is applied. Do not treat weight decay as an interchangeable
 L2 loss penalty or dropout as a keep probability. If an architecture has several widths or dropout rates,
 declare their meaning and additional typed fields locally; do not silently ignore inherited settings.
-For a neural algorithm without meaningful width/depth or microbatch semantics, use `AlgorithmConfig`
+For a neural algorithm without meaningful capacity scaling or microbatch semantics, use `AlgorithmConfig`
 with explicit local fields instead of inventing a mapping just to satisfy this optional interface.
 
-For example, a transformer can define width as its hidden dimension and depth as its number of encoder
-blocks. This illustrative configuration adds attention heads without a mutable dictionary:
+For example, a transformer can scale its hidden dimension while keeping depth fixed. This illustrative
+policy rounds down to a multiple of attention heads, with at least one dimension per head. The reference
+width must already be divisible by the head count, so `capacity=1.0` preserves the reference architecture.
+Other algorithms may scale depth, several dimensions, or target parameter counts; document and test the
+exact mapping and rounding. `capacity=2.0` does **not** universally mean twice the parameters or FLOPs.
 
 ```python
-from dataclasses import dataclass, field, replace
-from meds_algorithm_core import NNCapacity, NNConfig
-
-
-@dataclass(frozen=True, kw_only=True)
-class TransformerCapacity(NNCapacity):
-    heads: int = 4
-
-    def validate(self):
-        super().validate()
-        if self.heads < 1 or self.width % self.heads:
-            raise ValueError("width must be divisible by positive heads")
+from dataclasses import dataclass, replace
+from meds_algorithm_core import NNConfig
 
 
 @dataclass(frozen=True)
 class TransformerConfig(NNConfig):
-    # Override both the annotation and default to preserve extra dimensions when loading.
-    capacity: TransformerCapacity = field(default_factory=lambda: TransformerCapacity(width=128, depth=4))
     learning_rate: float = 0.001
     batch_size: int = 32
     weight_decay: float = 0.01
     dropout: float = 0.1
+    reference_width: int = 128
+    depth: int = 4
+    heads: int = 4
+
+    @property
+    def hidden_size(self) -> int:
+        return max(1, int(self.reference_width * self.capacity / self.heads)) * self.heads
+
+    def validate(self):
+        super().validate()
+        if self.heads < 1 or self.reference_width < 1 or self.reference_width % self.heads:
+            raise ValueError("reference_width must be positive and divisible by positive heads")
+        if self.depth < 1:
+            raise ValueError("depth must be positive")
 
 
 config = TransformerConfig()
-larger = replace(config, capacity=replace(config.capacity, width=256))
+larger = replace(config, capacity=2.0)
+assert larger.hidden_size == 256
 larger.save("config.json")
 assert TransformerConfig.load("config.json") == larger
 ```
 
-Override `validate()` with `super().validate()` when adding constraints to `NNConfig` or `NNCapacity`.
+Override `validate()` with `super().validate()` when adding constraints to `NNConfig`.
 Set the implementation's `config_type = TransformerConfig` and export the named config from its package.
 The existing runner records every resolved field in `config.json` and the manifest. YAML uses the same
 names; `lr` and `bs` aliases are intentionally not accepted:
 
 ```yaml
-capacity:
-  width: 256
-  depth: 4
-  heads: 4
+capacity: 2.0
+reference_width: 128
+depth: 4
+heads: 4
 learning_rate: 0.001
 batch_size: 32
 weight_decay: 0.01
 dropout: 0.1
 ```
 
-Capacity dimensions are experimental inputs, not a comparable measured parameter count. For scaling-law
+The capacity multiplier is an experimental input, not a comparable measured parameter count. For scaling-law
 analysis, an implementation should separately report total and trainable parameters of the instantiated
-network, actual optimizer steps, consumed examples/events/tokens (with units), and effective batch size.
+network, resolved architecture dimensions, actual optimizer steps, consumed examples/events/tokens (with
+units), and effective batch size. Record resolved dimensions in an algorithm-owned payload/report as well
+as retaining the multiplier, reference settings and implementation revision in existing core provenance.
 For fixed-size full microbatches, effective batch size is `batch_size × gradient_accumulation_steps ×
 world_size`; uneven batches or dynamic token batching require actual measurements. Any accumulation,
 distributed or token-budget settings belong in the concrete config. Core does not infer these quantities,

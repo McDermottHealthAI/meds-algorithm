@@ -27,18 +27,6 @@ class AlgorithmConfig(Serializable):
 
 
 @dataclass(frozen=True, kw_only=True)
-class NNCapacity(Serializable):
-    """Architecture dimensions, not a parameter count; algorithms define their exact meaning."""
-
-    width: int
-    depth: int
-
-    def validate(self):
-        if self.width < 1 or self.depth < 1:
-            raise ValueError("capacity width and depth must be positive")
-
-
-@dataclass(frozen=True, kw_only=True)
 class NNConfig(AlgorithmConfig):
     """Framework-independent neural-network settings; concrete algorithms supply training defaults.
 
@@ -46,7 +34,7 @@ class NNConfig(AlgorithmConfig):
     Subclasses overriding validate() must call super().validate().
     """
 
-    capacity: NNCapacity
+    capacity: float = 1.0
     learning_rate: float
     batch_size: int
     weight_decay: float = 0.0
@@ -54,6 +42,8 @@ class NNConfig(AlgorithmConfig):
 
     def validate(self):
         super().validate()
+        if self.capacity <= 0:
+            raise ValueError("capacity must be positive")
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be positive")
         if self.batch_size < 1:

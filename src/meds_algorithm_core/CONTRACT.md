@@ -377,14 +377,16 @@ explicit class; loaders MUST NOT import a class named by a document. Relative pa
 files resolve against that file's parent. Methods reopen persisted inputs and MUST NOT depend on prior
 calls on the same Python object. Algorithm tests MUST exercise fresh-process reconstruction and execution.
 
-Neural algorithms MAY extend `NNConfig`, a child of `AlgorithmConfig`, for shared `NNCapacity`
-(`width`, `depth`), `learning_rate`, `batch_size`, `weight_decay` and `dropout` settings. Width/depth MUST
-have documented architecture-specific meanings; they are not measured parameter counts. Batch size means
+Neural algorithms MAY extend `NNConfig`, a child of `AlgorithmConfig`, for shared `capacity`,
+`learning_rate`, `batch_size`, `weight_decay` and `dropout` settings. Capacity is a positive finite multiplier
+relative to a documented reference architecture, defaulting to `1.0`. Implementations MUST document and
+test its mapping to architecture dimensions, rounding and minimums; it is not a measured parameter count
+or a universal linear scaling of parameters/compute. Batch size means
 examples per device per microbatch before accumulation. Learning rate is the base rate before scheduling;
 dropout is a drop probability, and weight decay is the optimizer's decay coefficient. Implementations
 MUST document and test how these settings control the actual architecture/training code. Subclasses that
-override `validate()` MUST call `super().validate()` to preserve inherited constraints. Additional
-architecture dimensions use a frozen `NNCapacity` subclass and a matching concrete `capacity` annotation.
+override `validate()` MUST call `super().validate()` to preserve inherited constraints. Reference dimensions
+and architecture-specific settings belong in the concrete algorithm configuration.
 The shared configuration does not select training cohorts or implement a scaling-law experiment runner.
 
 `Command.run(mapping) -> Path` and `LegacyAlgorithmRepository` provide mapping-based dispatch after an
