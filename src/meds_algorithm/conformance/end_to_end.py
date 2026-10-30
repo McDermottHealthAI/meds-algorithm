@@ -3,7 +3,7 @@
 from contextlib import suppress
 from pathlib import Path
 
-from meds_algorithm_core import (
+from meds_algorithm import (
     ALGORITHM_PROFILES,
     STEP_SPECS,
     ZERO_SHOT_TASK_COMMANDS,
@@ -20,7 +20,7 @@ def _strip_labels(labels_dir: Path, destination: Path, splits) -> Path:
     """Remove outcomes from selected splits while retaining permitted training/context outcomes."""
     import polars as pl
 
-    from meds_algorithm_core import split_files
+    from meds_algorithm import split_files
 
     labels_dir = Path(labels_dir)
     files = split_files(labels_dir)

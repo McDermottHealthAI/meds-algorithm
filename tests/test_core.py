@@ -3,9 +3,9 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from meds_algorithm_core.contracts.commands import STEP_SPECS, CommandName
-from meds_algorithm_core.data.index import read_index, split_files
-from meds_algorithm_core.spec import specification
+from meds_algorithm.contracts.commands import STEP_SPECS, CommandName
+from meds_algorithm.data.index import read_index, split_files
+from meds_algorithm.spec import specification
 
 
 def labelled_file(path, subject=1):

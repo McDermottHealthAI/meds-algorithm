@@ -51,7 +51,11 @@ class Algorithm(ABC):
         for _, artifact in request.artifact_inputs():
             if artifact.kind.value.endswith("algorithm"):
                 producer = artifact.read_manifest().get("algorithm", {})
-                if producer.get("name") != self.name or producer.get("config") != self.config.to_dict():
+                recorded = producer.get("config")
+                if isinstance(recorded, dict):
+                    # Artifacts predating this optional field mean no feature additions.
+                    recorded = {"additional_predicates_file": None, **recorded}
+                if producer.get("name") != self.name or recorded != self.config.to_dict():
                     raise ValueError(
                         "Algorithm algorithm/configuration mismatch; load its recorded configuration"
                     )

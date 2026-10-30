@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from meds_algorithm_core import measured_artifact, read_manifest, write_run_result
-from meds_algorithm_core.artifacts.inputs import resolve_input
-from meds_algorithm_core.artifacts.publication import staged_directory
-from meds_algorithm_core.runtime.provenance import code_provenance
-from meds_algorithm_core.runtime.resources import _ProcessTreeMemorySampler
+from meds_algorithm import measured_artifact, read_manifest, write_run_result
+from meds_algorithm.artifacts.inputs import resolve_input
+from meds_algorithm.artifacts.publication import staged_directory
+from meds_algorithm.runtime.provenance import code_provenance
+from meds_algorithm.runtime.resources import _ProcessTreeMemorySampler
 
 
 def publish(path, **kwargs):
@@ -138,7 +138,7 @@ def test_process_tree_includes_worker_thread_children():
 
 
 def test_unavailable_resource_measurement_is_reported_honestly(monkeypatch):
-    from meds_algorithm_core.runtime import resources
+    from meds_algorithm.runtime import resources
 
     monkeypatch.setattr(resources, "resource", None)
     sampler = _ProcessTreeMemorySampler()
