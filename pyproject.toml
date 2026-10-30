@@ -32,7 +32,8 @@ packages = ["src/meds_algorithm"]
 testpaths = ["tests"]
 
 [project.urls]
-Repository = "https://github.com/florian6973/meds-algorithm"
+Repository = "https://github.com/McDermottHealthAI/meds-algorithm"
+Documentation = "https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md"
 
 [dependency-groups]
 dev = ["ruff"]

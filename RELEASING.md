@@ -1,78 +1,115 @@
-# Releasing meds-algorithm
+# Publishing meds-algorithm and its template
 
-Release validation has three stages: validate the distributions, rehearse delivery through TestPyPI,
-then verify installation from PyPI. Package validation does not replace scientific validation of
-downstream algorithms.
+Publish **meds-algorithm first**, then **meds-algorithm-template**. Moving GitHub repositories does not
+create or transfer PyPI projects. These steps assume the preparation PRs have been reviewed and merged
+into each repository's `main`. No package is uploaded by normal CI, a push, or creating a tag.
 
-## Distribution checks
+## 1. Configure accounts and Trusted Publishers
 
-CI runs lint and tests on Python 3.11, 3.12 and 3.13, then builds a source distribution and a wheel
-with `uv build` (the wheel is built from the source distribution). It also:
+Use the PyPI account that should own the projects. Enable its required two-factor authentication and
+configure a pending publisher at [PyPI publishing](https://pypi.org/manage/account/publishing/), and
+separately at [TestPyPI publishing](https://test.pypi.org/manage/account/publishing/).
+If a project already exists under your account, add a publisher in that project's Publishing settings.
+A pending publisher does not reserve a name; check availability before the first upload.
 
-- Runs `twine check --strict` on both distributions to validate metadata and README rendering.
-- Installs the base wheel in a fresh environment, without Polars or pytest, and exercises all three
-  installed CLI entry points, the packaged contract and artifact publication.
-- Installs the `conformance` extra and runs the test suite from outside the checkout against that
-  wheel, with isolated Python imports, followed by dependency compatibility checks.
-- Exercises the base wheel on Windows as well as Linux.
+Use these exact values on **both indexes**:
 
-Before the first index release, generate both a single-profile repository and a repository containing
-all six profiles from the template. Install their wheels with the candidate core distribution and
-run their registry and operational tests. Confirm that the generated wheel does not contain a copy
-of `meds_algorithm` or `meds_algorithm_contract`, and that the documentation builds with the installed
-contract. These checks validate template integration; generated algorithm methods are still skeletons.
+| Field | Shared package | Template generator |
+|---|---|---|
+| PyPI project | `meds-algorithm` | `meds-algorithm-template` |
+| GitHub owner | `McDermottHealthAI` | `McDermottHealthAI` |
+| GitHub repository | `meds-algorithm` | `MEDS_algorithm_template` |
+| Workflow filename | `publish.yml` | `publish.yml` |
+| Environment on TestPyPI | `testpypi` | `testpypi` |
+| Environment on PyPI | `pypi` | `pypi` |
 
-## TestPyPI rehearsal
+The GitHub repository spelling and the PyPI distribution spelling are intentionally different for the
+template. PyPI project ownership is independent of GitHub organization membership; add the appropriate
+maintainers or PyPI organization separately.
 
-Use a fresh output directory so distributions from earlier versions cannot be uploaded accidentally.
-The following commands assume Bash, `uv`, and an authenticated upload configuration. Run from the
-core checkout; substitute the candidate version when it changes.
+An organization repository administrator must configure the `testpypi` and `pypi` GitHub environments
+under Settings → Environments in both repositories. Restrict deployment to reviewed release tags
+(`v*`) and add a required reviewer for `pypi`. The transferred account currently has write access;
+administering environments may require an organization owner. No PyPI API token or GitHub secret is
+needed with Trusted Publishing. The workflows grant `id-token: write` only to the upload job.
+
+See the official [pending-publisher setup](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
+and [publishing action](https://docs.pypi.org/trusted-publishers/using-a-publisher/) documentation.
+
+## 2. Release the shared package first
+
+Current candidate: **0.4.0a4**. Run the following in Bash/WSL with Git, GitHub CLI and uv installed.
+Use the reviewed `main` commit, and wait for its CI checks before tagging. Do not move or reuse a
+published release tag/version; increment `project.version` for a replacement.
 
 ```bash
-release_dir=$(mktemp -d)
-uv build --out-dir "$release_dir"
-uvx --from 'twine>=6' twine check --strict "$release_dir"/*
-uvx --from 'twine>=6' twine upload --repository testpypi "$release_dir"/*
+git clone https://github.com/McDermottHealthAI/meds-algorithm.git
+cd meds-algorithm
+git switch main
+git pull --ff-only
+uv sync --locked --extra test --group dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+uv build
+uvx --from 'twine>=6' twine check --strict dist/*
+git tag v0.4.0a4
+git push origin v0.4.0a4
 
-test_env=$(mktemp -d)
-uv venv "$test_env"
-uv pip install --python "$test_env/bin/python" 'pyyaml>=6'
-uv pip install --python "$test_env/bin/python" \
-  --index-url https://test.pypi.org/simple/ --no-deps 'meds-algorithm==0.4.0a4'
-"$test_env/bin/python" -I tests/wheel_smoke.py
-uv pip check --python "$test_env/bin/python"
+gh workflow run publish.yml --repo McDermottHealthAI/meds-algorithm \
+  --ref v0.4.0a4 -f index=testpypi
+gh run list --repo McDermottHealthAI/meds-algorithm --workflow publish.yml --limit 5
+# Select the run created above and watch it:
+gh run watch RUN_ID --repo McDermottHealthAI/meds-algorithm --exit-status
 ```
 
-Install dependencies from PyPI separately. Do not rely on TestPyPI containing them or combine the
-two indexes for dependency resolution. Inspect the TestPyPI project page for the expected README,
-version, license, extras and files. Compare downloaded wheel and source-distribution SHA-256 hashes
-with the local candidates before promoting those same files to PyPI.
+The workflow checks that the tag equals `v` plus `project.version` and belongs to `main` history. It
+runs lint/tests, builds from source, checks distribution metadata, installs the standalone wheel and
+runs its smoke checks before uploading. Distributions are retained as the `distributions` Actions
+artifact. Each TestPyPI/PyPI invocation rebuilds from the same tag; it does not promote the previous
+run's exact archive bytes.
 
-TestPyPI has separate accounts and publisher configuration from PyPI. Uploads are not part of normal
-CI. See the [official TestPyPI guide](https://packaging.python.org/en/latest/guides/using-testpypi/).
+Verify the TestPyPI installation in a clean environment, installing dependencies from PyPI separately:
 
-## Publishing setup and promotion
+```bash
+check_env=$(mktemp -d)
+uv venv "$check_env"
+uv pip install --python "$check_env/bin/python" 'pyyaml>=6'
+uv pip install --python "$check_env/bin/python" --no-deps \
+  --index-url https://test.pypi.org/simple/ 'meds-algorithm==0.4.0a4'
+"$check_env/bin/python" -I tests/wheel_smoke.py
+uv pip check --python "$check_env/bin/python"
+```
 
-Prefer GitHub Actions Trusted Publishing. It requires a publisher configured on the index and a
-matching release workflow in this repository; neither an ordinary CI run nor a GitHub repository
-alone grants permission to publish. A new project can use a pending publisher. Configure PyPI and
-TestPyPI separately, with the following proposed values when adding the release workflow:
+After the test release is verified, publish the same tag to PyPI and approve its environment deployment:
 
-| Field | PyPI | TestPyPI |
-| --- | --- | --- |
-| Project | `meds-algorithm` | `meds-algorithm` |
-| GitHub owner | `florian6973` | `florian6973` |
-| Repository | `meds-algorithm` | `meds-algorithm` |
-| Workflow filename | `publish.yml` | `publish.yml` |
-| GitHub environment | `pypi` | `testpypi` |
+```bash
+gh workflow run publish.yml --repo McDermottHealthAI/meds-algorithm \
+  --ref v0.4.0a4 -f index=pypi
+# Find and watch the new run as above. After it succeeds:
+pypi_env=$(mktemp -d)
+uv venv "$pypi_env"
+uv pip install --python "$pypi_env/bin/python" 'meds-algorithm==0.4.0a4'
+"$pypi_env/bin/python" -I tests/wheel_smoke.py
+uv pip check --python "$pypi_env/bin/python"
+```
 
-The release workflow should upload the tested distributions with
-`pypa/gh-action-pypi-publish`, grant `id-token: write` only to publishing jobs, and promote the same
-verified files after the TestPyPI installation check. This workflow is not installed yet.
-See [PyPI's Trusted Publishing setup](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
-and [publishing instructions](https://docs.pypi.org/trusted-publishers/using-a-publisher/).
+Keep TestPyPI and PyPI separate; do not combine them with an extra index for dependency resolution.
+See the official [TestPyPI guide](https://packaging.python.org/en/latest/guides/using-testpypi/).
 
-After publishing, repeat the clean-environment installation with the default PyPI index and the exact
-version, then switch the template's Git dependency to `meds-algorithm==<version>` (retaining its
-`conformance` extra where needed). Update the lockfile, rerun generated-project checks and rebuild the
-documentation preview. Alpha versions require an explicit version pin or prerelease selection.
+## 3. Cut over and release the template
+
+Only after `meds-algorithm==0.4.0a4` installs from PyPI, follow the
+[template release guide](https://github.com/McDermottHealthAI/MEDS_algorithm_template/blob/main/RELEASING.md).
+It switches the development and generated dependencies from the Git pin to the released package,
+updates the lockfile/docs, and publishes the generator at **0.4.0a1** with tag **v0.4.0a1**.
+Its release preflight deliberately refuses publication until that cutover is complete.
+
+## 4. After first publication
+
+Replace each README's `PyPI-unreleased-lightgrey` badge with
+`https://img.shields.io/pypi/v/meds-algorithm` or
+`https://img.shields.io/pypi/v/meds-algorithm-template`, linking to the corresponding PyPI project.
+If the default badge omits an alpha release, use the Shields `include_prereleases` option.
+Update the install instructions from candidate/future wording to the verified release. Keep alpha
+versions explicit in install commands. No model-repository migrations are performed by publishing.
