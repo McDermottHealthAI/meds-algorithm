@@ -1,0 +1,71 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      index:
+        description: Package index (run from a reviewed v<version> tag)
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}-${{ inputs.index }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - name: Verify release tag and reviewed main history
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          from pathlib import Path
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          assert os.environ["GITHUB_REF"] == f"refs/tags/v{version}", "Dispatch from the matching v<version> tag"
+          PY
+          git merge-base --is-ancestor HEAD origin/main
+      - run: uv sync --locked --extra test --group dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - run: uv build
+      - run: uvx --from 'twine>=6' twine check --strict dist/*
+      - name: Verify the installed base wheel
+        run: |
+          uv venv /tmp/release-wheel
+          uv pip install --python /tmp/release-wheel/bin/python dist/*.whl
+          /tmp/release-wheel/bin/python -I tests/wheel_smoke.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.index }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.index == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}

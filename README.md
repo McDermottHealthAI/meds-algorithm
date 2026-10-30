@@ -1,5 +1,13 @@
 # meds-algorithm
 
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![PyPI: unreleased](https://img.shields.io/badge/PyPI-unreleased-lightgrey)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/RELEASING.md)
+[![Tests and code quality](https://github.com/McDermottHealthAI/meds-algorithm/actions/workflows/ci.yml/badge.svg)](https://github.com/McDermottHealthAI/meds-algorithm/actions/workflows/ci.yml)
+[![Documentation](https://img.shields.io/badge/docs-architecture-blue)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md)
+[![Contributors](https://img.shields.io/github/contributors/McDermottHealthAI/meds-algorithm)](https://github.com/McDermottHealthAI/meds-algorithm/graphs/contributors)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/McDermottHealthAI/meds-algorithm/pulls)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/LICENSE)
+
 Shared infrastructure for implementing and validating MEDS algorithm repositories. The package defines
 algorithm profiles and command contracts, manages artifacts and run provenance, reads prediction indices
 and training targets, validates prediction outputs, and provides reusable conformance tests.
@@ -7,7 +15,7 @@ and training targets, validates prediction outputs, and provides reusable confor
 Algorithm repositories import these utilities so fixes can be distributed through a package update.
 Algorithm architectures, tokenizers, training objectives and task-specific logic stay in the algorithm repository.
 
-See the [architecture and UML diagrams](ARCHITECTURE.md) for the profile hierarchy, typed requests,
+See the [architecture and UML diagrams](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md) for the profile hierarchy, typed requests,
 algorithm-owned configuration, artifact references and shared execution path.
 
 ## Package layout
@@ -43,9 +51,9 @@ src/meds_algorithm/
 ## Installation and dependencies
 
 Install a reviewed revision with
-`pip install 'meds-algorithm @ git+https://github.com/florian6973/meds-algorithm.git@<full-commit-sha>'`.
+`pip install 'meds-algorithm @ git+https://github.com/McDermottHealthAI/meds-algorithm.git@<full-commit-sha>'`.
 The template currently records the exact SHA. For package-index release checks and publishing setup,
-see the [release guide](https://github.com/florian6973/meds-algorithm/blob/main/RELEASING.md).
+see the [release guide](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/RELEASING.md).
 
 - Base package: PyYAML; no dataframe engine, test runner, GPU or algorithm framework is imported by base APIs.
 - `data` extra: Polars for index/target reads and prediction validation.
@@ -59,11 +67,11 @@ New algorithm repositories implement `Algorithm` profile subclasses, receive fro
 execute through `AlgorithmRepository`/`StepRunner`. Their own frozen `AlgorithmConfig` subclass defines
 hyperparameters, defaults and validation. Use `config_file=...` for a JSON/YAML values mapping or a
 previously saved `config.json`. Typed prediction execution requires the `data` extra. See the
-[architecture guide](ARCHITECTURE.md) for the complete ownership and serialization algorithm.
+[architecture guide](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md) for the complete ownership and serialization algorithm.
 
 Neural algorithms can extend `NNConfig` for a capacity multiplier, learning rate, batch size,
 weight decay and dropout. Concrete algorithms define the multiplier-to-architecture mapping and training
-defaults. See [neural configuration and scaling](ARCHITECTURE.md#neural-network-configuration-and-scaling-experiments)
+defaults. See [neural configuration and scaling](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md#neural-network-configuration-and-scaling-experiments)
 for an extensible example and the recommended upstream ownership of data scaling.
 
 ## Ownership
