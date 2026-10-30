@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meds-algorithm-core"
-version = "0.4.0a2"
+version = "0.4.0a3"
 description = "Shared MEDS algorithm contracts and conformance boundaries."
 readme = "README.md"
 license = "MIT"

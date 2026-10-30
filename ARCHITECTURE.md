@@ -85,6 +85,23 @@ classDiagram
         <<frozen dataclass>>
         algorithm parameters and defaults
     }
+    class NNConfig {
+        <<frozen dataclass>>
+        capacity
+        learning_rate
+        batch_size
+        weight_decay
+        dropout
+    }
+    class NNCapacity {
+        <<frozen dataclass>>
+        width
+        depth
+    }
+    class AlgorithmOwnedNNConfig {
+        <<frozen dataclass>>
+        architecture-specific defaults and settings
+    }
     class StepRequest {
         <<frozen dataclass>>
         output
@@ -122,6 +139,9 @@ classDiagram
         overwrite
     }
     AlgorithmConfig <|-- AlgorithmOwnedConfig
+    AlgorithmConfig <|-- NNConfig
+    NNConfig <|-- AlgorithmOwnedNNConfig
+    NNConfig *-- NNCapacity : capacity
     StepRequest <|-- PredictSupervisedRequest
     ArtifactReference <|-- PreparedDataArtifact
     ArtifactReference <|-- SupervisedAlgorithmArtifact
@@ -175,6 +195,112 @@ configs. Preprocessing alone composes it with dataset predicates, rejects duplic
 supplies a resolved `request.predicates_file` to the hook and method. The runner preserves that file
 inside prepared data with source/resolved digests; its contents are reserved. Later stages do not read
 the additions, and `TaskSpec` continues to use the original task binding. See contract section 2.3.
+
+## Neural-network configuration and scaling experiments
+
+`AlgorithmConfig` is the common parent. `NNConfig` is an optional, framework-independent child for
+neural algorithms whose settings have the semantics below. It provides validation and serialization,
+not a neural network, optimizer or training loop. Classical algorithms continue to extend
+`AlgorithmConfig` directly.
+
+| Setting | Meaning and validation |
+|---|---|
+| `capacity.width` | Positive integer architecture width; the algorithm documents the exact dimension |
+| `capacity.depth` | Positive integer architecture depth; the algorithm documents which layers are counted |
+| `learning_rate` | Positive finite base optimizer learning rate, before scheduling |
+| `batch_size` | Positive integer examples per device per microbatch, before gradient accumulation |
+| `weight_decay` | Nonnegative finite weight-decay coefficient; defaults to zero |
+| `dropout` | Finite probability of dropping a unit, in `[0, 1)`; defaults to zero |
+
+Core deliberately supplies no default width, depth, learning rate or batch size. A concrete algorithm
+supplies source-defined defaults, chooses its optimizer and scheduler, and specifies which parameter
+groups receive weight decay and where dropout is applied. Do not treat weight decay as an interchangeable
+L2 loss penalty or dropout as a keep probability. If an architecture has several widths or dropout rates,
+declare their meaning and additional typed fields locally; do not silently ignore inherited settings.
+For a neural algorithm without meaningful width/depth or microbatch semantics, use `AlgorithmConfig`
+with explicit local fields instead of inventing a mapping just to satisfy this optional interface.
+
+For example, a transformer can define width as its hidden dimension and depth as its number of encoder
+blocks. This illustrative configuration adds attention heads without a mutable dictionary:
+
+```python
+from dataclasses import dataclass, field, replace
+from meds_algorithm_core import NNCapacity, NNConfig
+
+
+@dataclass(frozen=True, kw_only=True)
+class TransformerCapacity(NNCapacity):
+    heads: int = 4
+
+    def validate(self):
+        super().validate()
+        if self.heads < 1 or self.width % self.heads:
+            raise ValueError("width must be divisible by positive heads")
+
+
+@dataclass(frozen=True)
+class TransformerConfig(NNConfig):
+    # Override both the annotation and default to preserve extra dimensions when loading.
+    capacity: TransformerCapacity = field(default_factory=lambda: TransformerCapacity(width=128, depth=4))
+    learning_rate: float = 0.001
+    batch_size: int = 32
+    weight_decay: float = 0.01
+    dropout: float = 0.1
+
+
+config = TransformerConfig()
+larger = replace(config, capacity=replace(config.capacity, width=256))
+larger.save("config.json")
+assert TransformerConfig.load("config.json") == larger
+```
+
+Override `validate()` with `super().validate()` when adding constraints to `NNConfig` or `NNCapacity`.
+Set the implementation's `config_type = TransformerConfig` and export the named config from its package.
+The existing runner records every resolved field in `config.json` and the manifest. YAML uses the same
+names; `lr` and `bs` aliases are intentionally not accepted:
+
+```yaml
+capacity:
+  width: 256
+  depth: 4
+  heads: 4
+learning_rate: 0.001
+batch_size: 32
+weight_decay: 0.01
+dropout: 0.1
+```
+
+Capacity dimensions are experimental inputs, not a comparable measured parameter count. For scaling-law
+analysis, an implementation should separately report total and trainable parameters of the instantiated
+network, actual optimizer steps, consumed examples/events/tokens (with units), and effective batch size.
+For fixed-size full microbatches, effective batch size is `batch_size × gradient_accumulation_steps ×
+world_size`; uneven batches or dynamic token batching require actual measurements. Any accumulation,
+distributed or token-budget settings belong in the concrete config. Core does not infer these quantities,
+instantiate optimizers or enforce that an implementation uses a field; algorithm tests must verify the
+mapping. There is no automatic scaling-law experiment runner or standardized scaling-results artifact yet.
+
+### Data scaling belongs to experiment orchestration
+
+Recommended ownership is upstream: MEDS-DEV or another experiment runner selects the training cohort
+and materializes or references an explicit subset before calling algorithms. This is an integration
+recommendation, not a claim that MEDS-DEV already implements that sampler. No `data_fraction` field or
+hidden sampler is added to `NNConfig`.
+
+- Fix the split assignment first. Select **training subjects**, retaining their valid history, rather than
+  sampling arbitrary event rows. Keep tuning and evaluation keys fixed across a data-scaling sweep.
+- Use deterministic nested subsets with a recorded selection seed and explicit membership digest/list.
+  Reuse the same subject membership across algorithms; a fraction and seed alone are not an identity.
+- Record dataset revision, eligible and selected subjects/events, selection rule and temporal cutoffs
+  upstream. Scope learned preprocessing and label bundles consistently to the selected training cohort.
+  For pretraining versus fine-tuning, declare separately which population is being scaled.
+- Let the algorithm report what was actually consumed after filtering/tokenization, plus repetitions and
+  training budget. Dataset size, unique token count and total tokens processed are different quantities;
+  choose whether a sweep fixes steps, epochs or compute and record that decision.
+
+These cohort-selection and consumption-reporting integrations remain future work. The implemented shared
+interface covers configuration and its existing persisted provenance; it does not perform data selection
+or count network parameters. Avoid adding another dataset-selection configuration until its upstream
+owner and identity format are agreed.
 
 ## Shared execution
 

@@ -25,7 +25,7 @@ from .artifacts.references import (
     TrajectoriesArtifact,
 )
 from .artifacts.results import write_run_result
-from .configuration import AlgorithmConfig, ExecutionOptions
+from .configuration import AlgorithmConfig, ExecutionOptions, NNCapacity, NNConfig
 from .contracts.commands import (
     ALGORITHM_PROFILES,
     STEP_SPECS,
@@ -63,6 +63,8 @@ __all__ = [
     "FinetuneAlgorithm",
     "FinetunedAlgorithmArtifact",
     "LegacyAlgorithmRepository",
+    "NNCapacity",
+    "NNConfig",
     "PayloadMetadata",
     "PredictOnlyAlgorithm",
     "PredictionsArtifact",
