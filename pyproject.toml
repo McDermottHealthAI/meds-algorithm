@@ -30,6 +30,11 @@ packages = ["src/meds_algorithm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "meds_dev: opt-in MEDS-DEV integration acceptance",
+  "real_data: opt-in MIMIC-IV demo acceptance",
+  "slow: integration requiring isolated environments or algorithm execution",
+]
 
 [project.urls]
 Repository = "https://github.com/McDermottHealthAI/meds-algorithm"

@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -183,3 +184,66 @@ def test_full_lifecycle_check_rejects_cached_outputs(tmp_path, pipeline):
         assert_label_blind_pipeline(
             result, profile="probe", run_e2e=lambda *args, **kwargs: result, tmp_path=tmp_path / "checks"
         )
+
+
+@pytest.mark.parametrize("profile", list(ALGORITHM_PROFILES))
+def test_inherited_end_to_end_executes_shared_checks(tmp_path, pipeline, profile):
+    from meds_algorithm.conformance.suite import AlgorithmConformanceTests
+
+    case = SimpleNamespace(run_e2e=pipeline, fitted_codes=lambda _: set())
+    AlgorithmConformanceTests().test_end_to_end(case, profile, tmp_path)
+
+
+@pytest.mark.parametrize("profile", list(ALGORITHM_PROFILES))
+def test_shared_demo_orchestration_preserves_profile_task_inputs(tmp_path, pipeline, monkeypatch, profile):
+    from meds_algorithm.conformance import suite
+
+    initial = pipeline(tmp_path / "initial", profile=profile)
+    predicates = tmp_path / "predicates.yaml"
+    predicates.write_text("signal: {code: SIGNAL}\n")
+    monkeypatch.setattr(
+        suite.integration,
+        "prepare_mimic_demo",
+        lambda *args: (initial.inputs["external_meds_dir"], initial.labels_dir, predicates),
+    )
+    criteria = initial.inputs["external_task_criteria_file"]
+    monkeypatch.setattr(suite.integration, "mimic_task_criteria", lambda _: criteria)
+    calls = []
+
+    def run(path, **inputs):
+        calls.append(inputs)
+        return pipeline(path, **inputs)
+
+    suite.AlgorithmConformanceTests().test_full_dag_on_mimic_iv_demo(
+        SimpleNamespace(run_e2e=run), profile, tmp_path / "meds-dev", tmp_path / "check"
+    )
+    assert calls[0]["external_predicates_file"] == predicates
+    assert calls[0]["splits"] == ["held_out"]
+    assert ("external_task_criteria_file" in calls[0]) == profile.startswith("zero_shot_")
+
+
+def test_shared_meds_dev_orchestration_validates_real_artifacts(tmp_path, pipeline, monkeypatch):
+    from meds_algorithm.conformance import suite
+    from meds_algorithm.conformance.types import MEDSDevRun
+
+    result = pipeline(tmp_path / "run", profile="supervised")
+    registered = tmp_path / "registered"
+    registered.mkdir()
+    (registered / "model.yaml").write_text("commands: {}\n")
+    monkeypatch.setattr(suite, "register", lambda *args: registered)
+    calls = []
+    monkeypatch.setattr(suite.integration, "run", lambda command, **kw: calls.append(command))
+    predictions = result.artifacts["predict_supervised"]
+    case = SimpleNamespace(
+        root=tmp_path,
+        name="example",
+        prepare_meds_dev_run=lambda *args, **kwargs: MEDSDevRun(
+            ["example=true"], predictions, result.labels_dir, result.splits
+        ),
+    )
+    check = suite.AlgorithmConformanceTests()
+    check.test_meds_dev_runs_algorithm_yaml(case, "supervised", tmp_path / "meds-dev", tmp_path)
+    assert calls[0][1:] == ["model=registered", "example=true"]
+    (predictions / "predictions.parquet").unlink()
+    with pytest.raises(FileNotFoundError, match="No prediction parquet"):
+        check.test_meds_dev_runs_algorithm_yaml(case, "supervised", tmp_path / "meds-dev", tmp_path)

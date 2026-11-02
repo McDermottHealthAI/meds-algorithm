@@ -573,3 +573,38 @@ functions. `staged_directory` and `measured_artifact` are context managers: thei
 between entry and exit, with cleanup and rollback on failure. A class wrapping these functions would
 not improve their current lifecycle. `_ProcessTreeMemorySampler` is a class because it manages a
 background sampler with start/stop state. The design does not require every function to become a method.
+
+## Shared acceptance tests
+
+The optional `meds-algorithm[conformance]` extra supplies `AlgorithmConformanceTests`.
+A generated test class inherits its eight tests; ordinary pytest fixtures connect the suite to a
+concrete repository. No production algorithm inherits from the testing classes.
+
+```mermaid
+classDiagram
+    class AlgorithmConformanceTests
+    class TestConformance
+    class AlgorithmCase {
+        root: Path
+        name: str
+        configurations: Sequence[AlgorithmConfig]
+        stub_profiles: Set[str]
+        profiles: tuple[str, ...]
+        create_repository() AlgorithmRepository
+        run_e2e() E2EResult
+        fitted_codes() Set[str]
+        prepare_meds_dev_run() MEDSDevRun
+    }
+    AlgorithmConformanceTests <|-- TestConformance
+    AlgorithmConformanceTests ..> AlgorithmCase : algorithm_case fixture
+    AlgorithmCase ..> AlgorithmRepository : factory derives profiles
+    AlgorithmCase ..> AlgorithmConfig : representative configurations
+    AlgorithmCase ..> E2EResult : execution adapter
+    AlgorithmCase ..> MEDSDevRun : integration adapter
+```
+
+The generated `profile` fixture parametrizes registered profiles. `AlgorithmCase` only describes
+inputs/adapters; it does not execute training or persist fitted state. `ProfileRunner` and
+`MEDSDevPreparer` are callable typing protocols, not additional required implementation base classes.
+Scientific tests and payload inspection stay in the algorithm repository. Shared test behavior and
+its canonical inventory live in the packaged `TESTING.md`, rendered by the template documentation.
