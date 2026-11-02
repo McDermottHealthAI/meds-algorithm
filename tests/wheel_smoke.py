@@ -8,15 +8,18 @@ from pathlib import Path
 
 from meds_algorithm import NNConfig, measured_artifact, read_manifest
 from meds_algorithm.conformance.cases import AlgorithmCase
-from meds_algorithm.spec import architecture, specification, validation_guide
+from meds_algorithm.spec import architecture, orchestration_guide, specification, validation_guide
 
 assert importlib.util.find_spec("polars") is None
 assert importlib.util.find_spec("pytest") is None
+assert importlib.util.find_spec("hydra") is None
+assert importlib.util.find_spec("submitit") is None
 assert importlib.util.find_spec("meds_algorithm_core") is None
 assert specification().splitlines()[0] == "# MEDS Algorithm Repository Contract, version 4"
 assert "classDiagram" in architecture() and "StepRunner" in architecture()
 assert "test_reloaded_request_runs_in_a_fresh_process" in validation_guide()
 assert "Downstream acceptance suite" in validation_guide()
+assert "Profile runner (prototype)" in orchestration_guide()
 assert AlgorithmCase.__module__ == "meds_algorithm.conformance.cases"
 with tempfile.TemporaryDirectory() as directory:
     config = NNConfig(capacity=0.5, learning_rate=0.001, batch_size=16)

@@ -18,6 +18,11 @@ def validation_guide() -> str:
     return files("meds_algorithm").joinpath("TESTING.md").read_text(encoding="utf-8")
 
 
+def orchestration_guide() -> str:
+    """Read the prototype coordinator guide, shared with the template documentation."""
+    return files("meds_algorithm").joinpath("ORCHESTRATION.md").read_text(encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()
