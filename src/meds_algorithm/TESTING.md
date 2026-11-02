@@ -26,6 +26,51 @@ paper, GPU correctness or absence of all leakage. Algorithm repositories must su
 cutoff/frozen-weight checks and end-to-end adapters for their concrete implementations. The label-blind
 rerun is an adversarial check, not a filesystem sandbox or proof against malicious code.
 
+## Downstream acceptance suite
+
+Install `meds-algorithm[conformance]` in an algorithm repository. Its
+`tests/test_conformance.py` subclasses `meds_algorithm.conformance.suite.AlgorithmConformanceTests`;
+pytest collects the inherited tests individually. There is no automatically registered plugin.
+These tests run against the concrete algorithm, not just against the shared package's toy fixtures.
+
+Supply two session-scoped fixtures in `tests/conftest.py`:
+
+- `algorithm_case`: an `AlgorithmCase` containing the repository root/name, repository factory,
+  representative concrete configurations, unfinished profiles and the three algorithm-owned adapters.
+- `profile`: parametrized with `create_repository().profiles`. Reuse this fixture in scientific tests
+  so newly registered profiles automatically receive coverage.
+
+`AlgorithmCase` derives its profiles from the repository and rejects empty configuration examples or
+unknown stub names. Configurations may have required constructor arguments; supply actual instances.
+The adapters remain `run_e2e`, `fitted_codes` and `prepare_meds_dev_run`; their contracts are described
+in the generated `tests/e2e.py` and the shared `E2EResult`/`MEDSDevRun` types.
+
+| Inherited test | What it checks | Why it exists |
+|---|---|---|
+| `test_profile_implementations_match_contract` | Compares each registered profile's commands with the core lifecycle. | Detect incorrect registration or dispatch wiring. |
+| `test_algorithm_configuration_roundtrips` | Saves and reloads each supplied concrete configuration. | Preserve settings across independent processes, including required constructor fields. |
+| `test_end_to_end` | Runs each implemented profile and checks artifacts, manifests, coverage, fresh label-blind reruns, split canaries and zero-shot task binding. | Detect broken persistence, label leakage and transductive fitting through the real lifecycle. |
+| `test_completed_algorithm_has_a_completed_report` | Validates report evidence for every completed profile. | Prevent incomplete profiles from masking unsupported completion claims. |
+| `test_algorithm_yaml_is_a_meds_dev_descriptor` | Checks each profile descriptor's required structure. | Catch packaging errors before integration. |
+| `test_slurm_dry_run_is_non_mutating` | Runs every profile's launcher with example inputs, checks the file inventory is unchanged and all commands are listed. | Inspect execution plans without submitting work; this checks file creation/removal, not changes to existing file contents. |
+| `test_meds_dev_runs_algorithm_yaml` | Registers and executes each completed profile through MEDS-DEV, then validates prediction shards, key coverage, manifest and memory evidence. | Prove descriptor/environment integration. Explicit `-m meds_dev` selection is required. |
+| `test_full_dag_on_mimic_iv_demo` | Executes each completed profile on MEDS-DEV's demo task, checks the lifecycle and final predictions. | Exercise the real-data boundary before full evaluation. Explicit `-m real_data` selection and repository data-access approval are required. |
+
+The integration checks share one session checkout. Zero-shot capability is required when a completed
+zero-shot profile is registered. Merely setting `MEDS_DEV_DIR`, running all tests, or selecting `slow`
+does not authorize provisioning. `algorithm_stub` skips mean unfinished work, not success. Registration,
+configuration and descriptor checks still run for stubs; the report gate still checks completed profiles.
+
+The generated **primary-behavior test remains algorithm-owned and fails until implemented**, even for
+stubs. Supply positive-signal evidence tied to real features and a shuffled-label negative control.
+Also test numerical fidelity, temporal cutoffs, frozen weights, configuration effects and reconstruction
+as appropriate. Shared acceptance checks cannot prove these algorithm-specific properties.
+
+Updating the pinned conformance dependency updates the inherited tests without copying their bodies
+into every repository. Review that dependency change and rerun the downstream suite. Extend local tests
+and adapters; do not override shared acceptance methods to suppress a failure. The inventory above is
+canonical and is rendered in the template documentation rather than copied into generated repositories.
+
 ## Test inventory
 
 ### test_algorithms.py
@@ -157,6 +202,26 @@ rerun is an adversarial check, not a filesystem sandbox or proof against malicio
 |---|---|---|
 | `test_unfinished_profile_does_not_hide_completed_evidence` | Checks reports with both completed and stub profiles. | Do not let an unfinished profile exempt a completed profile from its evidence requirements. |
 | `test_completing_last_profile_requires_its_evidence` | Marks the last stub complete without supplying its report evidence. | Keep completion gates meaningful for every implemented profile. |
+
+### Shared-suite execution regressions in test_conformance.py
+
+| Test | What it checks | Why it exists |
+|---|---|---|
+| `test_inherited_end_to_end_executes_shared_checks` | Runs the inherited method with synthetic real artifacts for all six profiles. | Verify extraction still reaches full lifecycle and leakage checks. |
+| `test_shared_demo_orchestration_preserves_profile_task_inputs` | Runs demo orchestration with synthetic files and checks predicates/task arguments for all profiles. | Preserve shared predicates and zero-shot-only task binding without downloading data. |
+| `test_shared_meds_dev_orchestration_validates_real_artifacts` | Replaces external execution but validates real prediction artifacts, then removes predictions. | Ensure integration dispatch is wired correctly and missing outputs fail. |
+
+### test_suite.py
+
+| Test | What it checks | Why it exists |
+|---|---|---|
+| `test_case_requires_configs_and_registered_stubs` | Rejects empty configuration examples and unregistered stub names. | Avoid vacuous config checks or silently misspelled completion metadata. |
+| `test_inherited_suite_collects_every_profile_without_duplicate_base` | Collects the suite in a separate pytest process for all six profiles. | Guarantee inherited coverage with readable test IDs and no duplicate collection of the base class. |
+| `test_stubs_skip_execution_but_contract_and_configs_still_run` | Executes an unfinished downstream repository. | Keep structural validation active without calling unfinished adapters. |
+| `test_completed_integrations_need_explicit_opt_in` | Runs completed profiles with default, `not slow` and `slow` selection. | Prevent accidental environment provisioning or data access. |
+| `test_integration_markers_select_only_their_suite` | Collects `meds_dev` and `real_data` independently. | Keep the two explicit integration choices separate. |
+| `test_mixed_completion_does_not_hide_report_requirements` | Completes one profile while leaving the others unfinished. | Preserve per-profile evidence gates after extraction. |
+| `test_provisioning_requires_task_capability_only_for_completed_zero_shot` | Checks capability requests with trainable-only and mixed zero-shot completion. | Require task passthrough for implemented zero-shot profiles without imposing it for stubs. |
 
 ## Installed-wheel verification
 

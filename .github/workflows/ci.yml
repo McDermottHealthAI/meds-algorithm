@@ -34,6 +34,7 @@ jobs:
           uv pip install --python /tmp/core-wheel/bin/python "${wheel}[conformance]"
           uv pip check --python /tmp/core-wheel/bin/python
           cp -r tests /tmp/core-wheel-tests
+          cp pyproject.toml /tmp/core-wheel-tests/
           cd /tmp
           /tmp/core-wheel/bin/python -I -m pytest -q /tmp/core-wheel-tests
   windows-wheel:

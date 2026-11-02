@@ -134,6 +134,8 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ### 0.4.0a5 (unreleased)
 
+- Ship an opt-in `AlgorithmConformanceTests` acceptance suite and typed `AlgorithmCase` adapter;
+  generated repositories inherit the checks and retain algorithm-specific scientific tests.
 - Remove `Command` and `LegacyAlgorithmRepository`; all algorithm execution uses typed profiles and the runner.
 - Rename fitted prediction request fields to `fitted_algorithm` and bump those request schemas to 2.
   External CLI argument names stay unchanged. Old request envelopes require explicit migration.
