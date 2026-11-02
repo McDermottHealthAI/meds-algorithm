@@ -125,26 +125,30 @@ def assert_label_blind_pipeline(result, *, profile, run_e2e, tmp_path):
     assert_prediction_keys(prediction, result.labels_dir, result.splits)
     # Do not require the evaluation-only boolean_value on a deliberately unlabelled run.
     import polars as pl
-    from polars.testing import assert_frame_equal
 
     from ..data.index import read_index
     from ..evaluation.predictions import check_decoded
 
     blind_predictions = read_predictions(prediction, require_truth=False)
     check_decoded(read_index(result.labels_dir, result.splits), blind_predictions)
-    columns = ["subject_id", "prediction_time", "predicted_boolean_probability"]
-    if "predicted_boolean_value" in original.columns:
-        columns.append("predicted_boolean_value")
+    keys = ["subject_id", "prediction_time"]
+    probability = "predicted_boolean_probability"
+    decisions = "predicted_boolean_value" in original.columns
+    columns = [*keys, probability, *(["predicted_boolean_value"] if decisions else [])]
+    # Explicit comparison instead of polars.testing.assert_frame_equal, whose tolerance keywords were
+    # renamed (rtol/atol -> rel_tol/abs_tol) within the supported polars>=1 range.
     try:
-        assert_frame_equal(
-            original.select(columns).sort(columns[:2]),
-            blind_predictions.select(columns).sort(columns[:2]),
-            check_exact=False,
-            rel_tol=1e-6,
-            abs_tol=1e-8,
-        )
-    except (AssertionError, pl.exceptions.ColumnNotFoundError) as error:
+        a = original.select(columns).sort(keys)
+        b = blind_predictions.select(columns).sort(keys)
+    except pl.exceptions.ColumnNotFoundError as error:
+        raise AssertionError("Label-blind predictions lack a column of the original run") from error
+    same = (
+        a.select(keys).equals(b.select(keys))
+        and ((a[probability] - b[probability]).abs() <= 1e-8 + 1e-6 * b[probability].abs()).all()
+        and (not decisions or a["predicted_boolean_value"].equals(b["predicted_boolean_value"]))
+    )
+    if not same:
         raise AssertionError(
             "Predictions changed when forbidden labels were removed; fix leakage or make the "
             "conformance fixture reproducible with the recorded seed"
-        ) from error
+        )

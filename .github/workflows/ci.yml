@@ -20,6 +20,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest -q
+      - name: Test at the declared polars floor (algorithms may pin old polars)
+        run: uv run --with 'polars==1.0.0' pytest -q
       - run: uv build
       - name: Validate distribution metadata and PyPI README rendering
         run: uvx --from 'twine>=6' twine check --strict dist/*
