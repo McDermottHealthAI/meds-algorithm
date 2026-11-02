@@ -135,8 +135,10 @@ old `infer`, `supervised_train`, and `predict` names are not aliases.
 | `zero_shot_materialized` | `preprocess_data → pretrain → infer_trajectories → predict_zero_shot_materialized` |
 | `predict_only` | `preprocess_data → predict_only` |
 
-The CLI is `meds-algorithm <step> --profile <profile> key=value ...`. `meds-algorithm profiles` lists declared
-profiles; `meds-algorithm commands --profile <profile>` lists their steps in dependency order. Profile
+Each algorithm repository exposes its own console command, named after its package (for example `retain`);
+it MUST NOT claim a generic command shared by other algorithms, such as `meds-algorithm`. The CLI is
+`<algorithm-command> <step> --profile <profile> key=value ...`. `<algorithm-command> profiles` lists declared
+profiles; `<algorithm-command> commands --profile <profile>` lists their steps in dependency order. Profile
 selection is mandatory when more than one is declared, including for shared commands. The dispatcher
 MUST reject a step belonging to another profile before invoking any algorithm code.
 
