@@ -1,0 +1,32 @@
+site_name: MEDS algorithms
+site_description: Shared MEDS algorithm infrastructure and implementation catalogue.
+site_url: https://mcdermotthealthai.github.io/meds-algorithm/
+repo_url: https://github.com/McDermottHealthAI/meds-algorithm
+repo_name: McDermottHealthAI/meds-algorithm
+edit_uri: edit/main/docs/
+docs_dir: docs
+strict: true
+hooks:
+  - docs/catalogue.py
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+nav:
+  - Overview: index.md
+  - Implemented algorithms: implemented-algorithms.md
+  - Development:
+      - Catalogue tests: catalogue-testing.md

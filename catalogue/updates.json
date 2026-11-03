@@ -1,0 +1,13 @@
+{
+  "observations": {
+    "genhpf-upstream": {
+      "latest_github_release": null,
+      "latest_pypi_release": null,
+      "pypi": "not_found",
+      "repository": "private_manual_review",
+      "reviewed_pypi_release": null,
+      "reviewed_release_available": null
+    }
+  },
+  "schema_version": 1
+}

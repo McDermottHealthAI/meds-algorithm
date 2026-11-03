@@ -3,7 +3,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/meds-algorithm)](https://pypi.org/project/meds-algorithm/)
 [![Tests and code quality](https://github.com/McDermottHealthAI/meds-algorithm/actions/workflows/ci.yml/badge.svg)](https://github.com/McDermottHealthAI/meds-algorithm/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-architecture-blue)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md)
+[![Documentation](https://img.shields.io/badge/docs-MEDS_algorithms-blue)](https://mcdermotthealthai.github.io/meds-algorithm/)
 [![Contributors](https://img.shields.io/github/contributors/McDermottHealthAI/meds-algorithm)](https://github.com/McDermottHealthAI/meds-algorithm/graphs/contributors)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/McDermottHealthAI/meds-algorithm/pulls)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/LICENSE)
@@ -17,6 +17,12 @@ Algorithm architectures, tokenizers, training objectives and task-specific logic
 
 See the [architecture and UML diagrams](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/ARCHITECTURE.md) for the profile hierarchy, typed requests,
 algorithm-owned configuration, artifact references and shared execution path.
+
+Browse the [algorithm catalogue](https://mcdermotthealthai.github.io/meds-algorithm/implemented-algorithms/)
+for implementations, reviewed installation commands and validation evidence. Register or update an
+entry through `catalogue/algorithms.yaml`; documentation builds and release observations are independent
+of the runtime package and never query private source repositories. See
+[site maintenance](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/docs/index.md).
 
 ## Package layout
 
@@ -133,6 +139,11 @@ MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selectio
 training. Keep each algorithm's data-access and cluster approval rules in its own repository.
 
 ## Changes
+
+### Unreleased
+
+- Host the algorithm catalogue and its release-observation workflow in this ecosystem repository.
+- Add independently built documentation; catalogue metadata and tooling are excluded from Python distributions.
 
 ### 0.4.0a5 (2026-11-03)
 
