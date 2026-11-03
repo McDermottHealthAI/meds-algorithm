@@ -608,3 +608,29 @@ inputs/adapters; it does not execute training or persist fitted state. `ProfileR
 `MEDSDevPreparer` are callable typing protocols, not additional required implementation base classes.
 Scientific tests and payload inspection stay in the algorithm repository. Shared test behavior and
 its canonical inventory live in the packaged `TESTING.md`, rendered by the template documentation.
+
+## Profile orchestration (prototype)
+
+The optional orchestration layer runs above the unchanged typed execution boundary. `RunConfig`
+is a Hydra input schema; the concrete algorithm Config remains authoritative for algorithm settings.
+`RunPlanner` derives artifact wiring from `StepSpec`/request types and validates before creating outputs.
+
+```mermaid
+classDiagram
+    RunPlanner ..> RunConfig : resolves
+    RunPlanner --> RunPlan : creates without writing
+    RunPlan *-- StagePlan
+    RunCoordinator ..> RunPlan : persists
+    RunCoordinator --> LocalExecution
+    RunCoordinator --> SubmititExecution
+    LocalExecution ..> StageJob
+    SubmititExecution ..> StageJob : submits with dependencies
+    StageJob ..> AlgorithmRepository : invokes existing CLI in fresh process
+    AlgorithmRepository --> StepRunner
+```
+
+A `StageJob` contains resolved CLI arguments and paths, never a fitted algorithm object.
+Local execution waits for each subprocess; SLURM submits the chain and returns a job-ID receipt.
+The same `RunPlan` is printed by dry-run or executed. Scheduling settings are persisted in `plan.json`,
+while algorithm configs/requests remain in each artifact manifest. The bundled `ORCHESTRATION.md`
+describes supported inputs, resource settings and limitations; the template embeds that same guide.

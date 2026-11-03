@@ -192,7 +192,7 @@ canonical and is rendered in the template documentation rather than copied into 
 | Test | What it checks | Why it exists |
 |---|---|---|
 | `test_run_preserves_output_and_failure` | Checks subprocess output and nonzero-exit propagation. | Do not swallow executable failures or lose diagnostic output. |
-| `test_timeout_stops_descendant_work` | Times out a subprocess tree and checks that its descendant cannot finish delayed work. | Prevent abandoned computation after the caller reports a timeout. |
+| `test_timeout_stops_descendant_work` | Times out a subprocess tree with captured or streamed logs and checks that its descendant cannot finish delayed work. | Prevent abandoned computation after the caller reports a timeout. |
 
 ### test_reports.py
 
@@ -223,17 +223,37 @@ canonical and is rendered in the template documentation rather than copied into 
 | `test_mixed_completion_does_not_hide_report_requirements` | Completes one profile while leaving the others unfinished. | Preserve per-profile evidence gates after extraction. |
 | `test_provisioning_requires_task_capability_only_for_completed_zero_shot` | Checks capability requests with trainable-only and mixed zero-shot completion. | Require task passthrough for implemented zero-shot profiles without imposing it for stubs. |
 
+### test_orchestration.py
+
+The prototype tests use temporary inputs and toy subprocesses. Scheduler submission is simulated;
+one callable is also executed through Submitit's real local executor. No SLURM jobs are submitted.
+
+| Test | What it checks | Why it exists |
+|---|---|---|
+| `test_all_profiles_resolve_typed_arguments_without_writing` | Plans all six profiles with absolute paths, dependencies and config defaults. | Keep wiring derived from the contract and dry-run independent of algorithm execution. |
+| `test_hydra_composition_interpolation_and_override_validation` | Composes shared schema/YAML, resolves interpolation and overrides, rejects unknown fields. | Avoid a second permissive algorithm config schema. |
+| `test_cli_dry_run_has_no_output_or_scheduler_side_effects` | Calls the actual core CLI planner in SLURM mode without executing. | Make review safe before selecting an execution backend. |
+| `test_missing_inputs_and_invalid_resources_fail_before_execution` | Rejects missing labels, unknown stages and invalid timeout limits. | Fail before expensive partial execution. |
+| `test_subset_requires_explicit_valid_reused_artifacts` | Requires typed upstream manifests for omitted stages and rejects ambiguous produced/reused inputs. | Prevent implicit reuse of unrelated runs. |
+| `test_real_local_run_records_plan_logs_and_fresh_processes` | Runs three real child processes and inspects plan/config/logs. | Verify persistence and process independence through the coordinator. |
+| `test_local_failure_stops_downstream_stages` | Fails training and verifies prediction never starts. | Preserve dependency semantics locally. |
+| `test_submitit_wires_resources_dependencies_receipts_and_cancellation` | Simulates the scheduler, checks resource overrides/afterok IDs and partial-submission cancellation. | Avoid unscheduled dependencies and unrecorded jobs when submission fails. |
+| `test_slurm_refuses_dirty_or_unknown_checkout` | Refuses submission without stable Git provenance. | Keep queued work tied to reviewed code. |
+| `test_slurm_rejects_output_that_would_dirty_checkout` | Rejects an unignored run directory inside the algorithm checkout. | Avoid submitting jobs that would fail their own code-provenance check. |
+| `test_probe_and_context_inputs_are_explicit` | Separates embedding/prediction indices and validates context splits. | Keep training representations and permitted context distinct from evaluation keys. |
+| `test_stage_job_runs_through_real_submitit_local_executor` | Pickles and executes a callable through Submitit, then rejects changed configuration. | Test worker serialization and immutable run settings without a cluster. |
+
 ## Installed-wheel verification
 
 `tests/wheel_smoke.py` is a standalone script, not a pytest test. In an environment containing only the
-base wheel it checks that optional Polars/pytest dependencies are absent, the contract/UML/test catalogue
+base wheel it checks that optional Polars/pytest/Hydra/Submitit dependencies are absent, the contract/UML/test catalogue
 are packaged, neural configuration round-trips, artifact publication works with unknown checkout provenance,
 and the three installed helper commands accept `--help`. This catches packaging and optional-import
 failures that tests run from an editable source checkout can miss.
 
 Run it after `uv build` in a separate environment containing the built wheel and only its base dependencies.
 The release workflow also validates distribution metadata with Twine. The full suite can then be rerun
-against the installed wheel with its conformance extra and tests copied outside the checkout.
+against the installed wheel with its conformance and orchestration extras and tests copied outside the checkout.
 
 ## Maintaining this catalogue
 

@@ -33,7 +33,7 @@ jobs:
       - name: Run conformance tests against the installed wheel outside the checkout
         run: |
           wheel=$(realpath dist/*.whl)
-          uv pip install --python /tmp/core-wheel/bin/python "${wheel}[conformance]"
+          uv pip install --python /tmp/core-wheel/bin/python "${wheel}[conformance,orchestration]"
           uv pip check --python /tmp/core-wheel/bin/python
           cp -r tests /tmp/core-wheel-tests
           cp pyproject.toml /tmp/core-wheel-tests/

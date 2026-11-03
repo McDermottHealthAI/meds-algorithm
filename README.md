@@ -29,6 +29,7 @@ src/meds_algorithm/
 ├── configuration.py            # AlgorithmConfig, NNConfig and execution options
 ├── serialization.py            # strict, versioned config/request JSON serialization
 ├── runner.py                   # validate, execute, measure, publish; CLI adapter
+├── orchestration/              # optional Hydra planning, local subprocesses and Submitit jobs
 ├── contracts/commands.py       # derived step specifications and validation
 ├── artifacts/
 │   ├── references.py           # lazy typed artifact references and payload metadata
@@ -56,6 +57,7 @@ see the [release guide](https://github.com/McDermottHealthAI/meds-algorithm/blob
 
 - Base package: PyYAML; no dataframe engine, test runner, GPU or algorithm framework is imported by base APIs.
 - `data` extra: Polars for index/target reads and prediction validation.
+- `orchestration` extra: Hydra configuration and Submitit; see the [prototype runner guide](src/meds_algorithm/ORCHESTRATION.md).
 - `conformance` extra: pytest, Polars, PyArrow and the pinned MEDS evaluation schema implementation.
 - `test` extra: dependencies for developing and testing this package.
 
@@ -133,6 +135,9 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 ## Changes
 
 ### 0.4.0a5 (unreleased)
+
+- Add an optional profile-runner prototype: shared Hydra schema, resolved dry-run plans, local
+  subprocess execution and dependent Submitit SLURM jobs. Existing per-step APIs remain unchanged.
 
 - Ship an opt-in `AlgorithmConformanceTests` acceptance suite and typed `AlgorithmCase` adapter;
   generated repositories inherit the checks and retain algorithm-specific scientific tests.
