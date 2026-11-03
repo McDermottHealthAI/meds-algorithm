@@ -134,7 +134,7 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ## Changes
 
-### 0.4.0a5 (unreleased)
+### 0.4.0a5 (2026-11-03)
 
 - Add an optional profile-runner prototype: shared Hydra schema, resolved dry-run plans, local
   subprocess execution and dependent Submitit SLURM jobs. Existing per-step APIs remain unchanged.
