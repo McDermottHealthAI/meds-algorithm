@@ -1,0 +1,28 @@
+schema_version: 1
+algorithms:
+  - id: genhpf-upstream
+    name: GenHPF (upstream package)
+    description: MEDS adapter using the original GenHPF implementation.
+    repository: https://github.com/florian6973/meds-model-genhpf-upstream
+    access: private
+    public_listing: true
+    paper: https://arxiv.org/abs/2207.09858
+    profiles: [supervised]
+    implementation_status: in_review
+    implementation_pr: 1
+    revision: f749d61fbbec92b1cd05d57fdeaa428c365cc266
+    reviewed_on: '2026-11-03'
+    package:
+      name: genhpf-meds
+      pypi_version: null
+    evidence:
+      report: IMPLEMENTATION_REPORT.md
+      synthetic: reported_pass
+      meds_dev: reported_pass
+      clinical_demo: pending
+      full_dataset: pending
+    notes: >-
+      Implementation is on open PR #1; main still contains stubs. Validation statuses summarize
+      the pinned implementation report, not a new independent execution. No PyPI distribution
+      was available at review; current dependencies include Git references. Repository and
+      evidence links require access. This is the first catalogue entry used to exercise registration.

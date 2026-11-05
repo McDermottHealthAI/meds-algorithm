@@ -1,0 +1,44 @@
+name: Catalogue updates
+
+on:
+  schedule:
+    - cron: '23 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalogue-updates
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked --group docs
+      - run: uv run --group docs pytest -q docs/tests/test_catalogue.py
+      - run: uv run python docs/catalogue.py --check-remote
+      - run: uv run --group docs mkdocs build --strict
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogue-observations
+          path: catalogue/updates.json
+      - uses: peter-evans/create-pull-request@v8
+        with:
+          branch: codex/catalogue-release-observations
+          add-paths: catalogue/updates.json
+          commit-message: Refresh catalogue release observations
+          title: Review algorithm catalogue release observations
+          body: |
+            Public release metadata changed. Review catalogue/updates.json, then update
+            catalogue/algorithms.yaml separately after checking the relevant revision and evidence.
+            This PR does not promote implementation or validation status and does not change install pins.
+            Private repositories were not queried. Registry tests and strict docs ran in the update workflow.
