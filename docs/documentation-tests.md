@@ -38,4 +38,3 @@ form inputs. jsdom is used only in tests.
 | Edits, copy, download, reset | Exact edited text and stale-output invalidation | Prevent copying outdated instructions |
 | Clipboard fallback | Selection after denied clipboard access | Support local previews and restricted browser contexts |
 | Inert HTML and repeated initialization | HTML-like user text and repeated page initialization | Prevent injection and lost edits |
-| Old-site redirects | Paths, queries, anchors, fixed destination origin and fallback link | Keep existing bookmarks usable after the move |

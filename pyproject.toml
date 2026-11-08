@@ -31,7 +31,7 @@ packages = ["src/meds_algorithm"]
 
 # Discovery metadata and its documentation tooling evolve independently of runtime releases.
 [tool.hatch.build.targets.sdist]
-exclude = ["/catalogue", "/docs", "/mkdocs.yml", "/redirects", "/site-redirects", "/node_modules", "/package.json", "/package-lock.json", "/.cache"]
+exclude = ["/catalogue", "/docs", "/mkdocs.yml", "/node_modules", "/package.json", "/package-lock.json", "/.cache"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

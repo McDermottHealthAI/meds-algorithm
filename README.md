@@ -147,9 +147,9 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 ### Unreleased
 
 - Consolidate the template guides, implementation prompt and interactive builder on Read the Docs;
-  preserve both former GitHub Pages sites with redirects.
+  use Read the Docs as the only documentation host.
 - Configure Read the Docs hosting with the existing MkDocs theme and docs dependency group; update
-  documentation links and document the transition from GitHub Pages.
+  documentation links and document Read the Docs hosting.
 - Host the algorithm catalogue and its release-observation workflow in this ecosystem repository.
 - Add independently built documentation; catalogue metadata and tooling are excluded from Python distributions.
 

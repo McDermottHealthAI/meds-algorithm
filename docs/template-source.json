@@ -1,7 +1,7 @@
 {
-  "revision": "3f2b0106dabfb60c806e607a372e67bbf0696381",
+  "revision": "3cf2969d7c15a78e4bf43994ed2121e0aea8ba65",
   "files": {
-    "RELEASING.md": "ebbf3efdc9e304acfe9d5b4cae786c10d508734ad97d8a33e2580f3d5f64a43f",
+    "RELEASING.md": "9e454e07cfb128f45009eeabc689e39dd0ba7ad4fb6605f06e034a695f9c3764",
     "TESTING.md": "8d2807417ef0d5c7bd299d2323e67bd65a63d6600b8e761a05ee30b6daf13d92",
     "template/RELEASING.md.jinja": "b01983b0cd1bb9f548d8cd6e893fbde4d0229f6caf3f6c9643e5efd4a4f6cea3",
     "template/docs/TESTING.md": "7259c80d9b8f40d9d801fd1e45389c012a2a86f3979e3c34aa1623abb0afeb74"

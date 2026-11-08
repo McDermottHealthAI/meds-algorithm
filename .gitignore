@@ -8,6 +8,5 @@ build/
 dist/
 site/
 
-site-redirects/
 .cache/
 node_modules/

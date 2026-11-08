@@ -34,8 +34,8 @@ From the root of this core checkout:
 ```bash
 uv sync --locked --group docs
 uv run --group docs pytest -q docs/tests
-uv run ruff check docs scripts
-uv run ruff format --check docs scripts
+uv run ruff check docs
+uv run ruff format --check docs
 npm ci --ignore-scripts
 npm test
 uv run --group docs mkdocs build --strict
@@ -46,22 +46,15 @@ Node 24 is needed only for browser tests, not for building or serving the site. 
 [documentation tests](documentation-tests.md) and [catalogue tests](catalogue-testing.md) for what each checks.
 Runtime tests remain under `tests/`; their inventory is [Shared-package tests](reference/tests.md).
 
-## Hosting and old links
+## Hosting
 
 Read the Docs builds with `.readthedocs.yaml`, Python 3.12, uv's `docs` dependency group and MkDocs Material.
 `READTHEDOCS_CANONICAL_URL` supplies the version-specific canonical URL, with a `latest` fallback locally.
 GitHub Actions runs documentation checks independently. Enable Read the Docs pull request builds in the
 project settings for hosted previews. Older release tags without this configuration cannot build this site.
 
-Both retired GitHub Pages sites now publish redirect pages, not a second documentation build:
-
-- `https://mcdermotthealthai.github.io/meds-algorithm/`
-- `https://mcdermotthealthai.github.io/MEDS_algorithm_template/`
-
-Keep Pages enabled in both repositories. `scripts/build_docs_redirects.py` creates files for known old
-routes listed in `redirects/paths.json` and a 404 fallback for other deep links. The redirect preserves
-the page path, query and section fragment. A visible Read the Docs link remains when JavaScript is disabled.
-The template workflow only publishes these redirects; all MkDocs and prompt tests run here.
+Read the Docs is the only documentation host. The template repository has no documentation deployment
+workflow; all MkDocs and prompt-builder checks run here.
 
 The catalogue update workflow still needs permission for Actions to create pull requests; see
 [catalogue maintenance](implemented-algorithms.md#register-or-update-an-algorithm) for its report fallback.

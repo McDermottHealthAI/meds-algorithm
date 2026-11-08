@@ -1,6 +1,6 @@
 name: Docs
 
-# Read the Docs hosts the full site. Pages deploys redirects for existing bookmarks.
+# Read the Docs hosts the site. This workflow only validates documentation changes.
 
 on:
   pull_request:
@@ -27,22 +27,3 @@ jobs:
       - run: uv run ruff check docs
       - run: uv run ruff format --check docs
       - run: uv run --group docs mkdocs build --strict
-      - run: python scripts/build_docs_redirects.py
-      - if: github.event_name == 'push'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site-redirects
-
-  deploy:
-    if: github.event_name == 'push'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
