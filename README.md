@@ -22,7 +22,11 @@ Browse the [algorithm catalogue](https://meds-algorithm.readthedocs.io/en/latest
 for implementations, reviewed installation commands and validation evidence. Register or update an
 entry through `catalogue/algorithms.yaml`; documentation builds and release observations are independent
 of the runtime package and never query private source repositories. See
-[site maintenance](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/docs/index.md).
+[site maintenance](https://meds-algorithm.readthedocs.io/en/latest/documentation/).
+
+The [unified documentation](https://meds-algorithm.readthedocs.io/en/latest/) also contains the
+template workflow, [implementation prompt builder](https://meds-algorithm.readthedocs.io/en/latest/prompt-builder/),
+manual tutorial, publishing guides and API/UML references.
 
 ## Package layout
 
@@ -142,6 +146,8 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ### Unreleased
 
+- Consolidate the template guides, implementation prompt and interactive builder on Read the Docs;
+  preserve both former GitHub Pages sites with redirects.
 - Configure Read the Docs hosting with the existing MkDocs theme and docs dependency group; update
   documentation links and document the transition from GitHub Pages.
 - Host the algorithm catalogue and its release-observation workflow in this ecosystem repository.

@@ -472,6 +472,7 @@ dev = [
     { name = "ruff" },
 ]
 docs = [
+    { name = "jinja2" },
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "packaging" },
@@ -500,6 +501,7 @@ provides-extras = ["data", "orchestration", "conformance", "test"]
 [package.metadata.requires-dev]
 dev = [{ name = "ruff" }]
 docs = [
+    { name = "jinja2", specifier = ">=3.1" },
     { name = "mkdocs", specifier = ">=1.6,<2" },
     { name = "mkdocs-material", specifier = ">=9.5,<10" },
     { name = "packaging", specifier = ">=24" },

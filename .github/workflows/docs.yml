@@ -1,7 +1,6 @@
 name: Docs
 
-# Checks the documentation on every pull request. GitHub Pages publishing remains enabled during the
-# Read the Docs transition; see docs/index.md for the cutover and old-URL redirect steps.
+# Read the Docs hosts the full site. Pages deploys redirects for existing bookmarks.
 
 on:
   pull_request:
@@ -18,15 +17,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked --group docs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm ci --ignore-scripts
+      - run: npm test
       - run: uv run --group docs pytest -q docs/tests
       - run: uv run --group docs python docs/catalogue.py
       - run: uv run ruff check docs
       - run: uv run ruff format --check docs
       - run: uv run --group docs mkdocs build --strict
+      - run: python scripts/build_docs_redirects.py
       - if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: site-redirects
 
   deploy:
     if: github.event_name == 'push'

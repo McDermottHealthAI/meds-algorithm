@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Documentation moved</title>
+<p>The MEDS algorithms documentation has moved to
+<a id="destination" href="https://meds-algorithm.readthedocs.io/en/latest/">Read the Docs</a>.</p>
+<script>
+(() => {
+  const base = "https://meds-algorithm.readthedocs.io/en/latest/";
+  const prefix = "/meds-algorithm/";
+  let suffix = location.pathname.startsWith(prefix) ? location.pathname.slice(prefix.length) : "";
+  suffix = suffix.replace(/index\.html$/, "").replace(/\.html$/, "/");
+  let fragment = location.hash;
+  const oldSections = {
+    "#maintaining-this-documentation": "#local-checks-and-preview",
+    "#read-the-docs-hosting": "#hosting-and-old-links",
+    "#github-pages-transition": "#hosting-and-old-links"
+  };
+  if (!suffix && Object.hasOwn(oldSections, fragment)) {
+    suffix = "documentation/";
+    fragment = oldSections[fragment];
+  }
+  const target = base + suffix + location.search + fragment;
+  document.getElementById("destination").href = target;
+  location.replace(target);
+})();
+</script>
+</html>
