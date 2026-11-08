@@ -1,0 +1,13 @@
+{
+  "name": "meds-algorithm-docs-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test docs/tests/*.test.cjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.3"
+  }
+}

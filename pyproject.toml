@@ -31,7 +31,7 @@ packages = ["src/meds_algorithm"]
 
 # Discovery metadata and its documentation tooling evolve independently of runtime releases.
 [tool.hatch.build.targets.sdist]
-exclude = ["/catalogue", "/docs", "/mkdocs.yml"]
+exclude = ["/catalogue", "/docs", "/mkdocs.yml", "/node_modules", "/package.json", "/package-lock.json", "/.cache"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -47,7 +47,7 @@ Documentation = "https://meds-algorithm.readthedocs.io/en/latest/"
 
 [dependency-groups]
 dev = ["ruff"]
-docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5,<10", "packaging>=24", "pytest>=8"]
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5,<10", "jinja2>=3.1", "packaging>=24", "pytest>=8"]
 
 [tool.ruff]
 line-length = 110

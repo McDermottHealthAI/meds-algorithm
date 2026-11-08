@@ -1,23 +1,22 @@
 site_name: MEDS algorithms
-site_description: Shared MEDS algorithm infrastructure and implementation catalogue.
 site_url: !ENV [READTHEDOCS_CANONICAL_URL, "https://meds-algorithm.readthedocs.io/en/latest/"]
+site_description: >-
+  A contract for MEDS algorithm repositories: MEDS data and a task in, MEDS predictions out, with every step
+  measured and reproducible.
 repo_url: https://github.com/McDermottHealthAI/meds-algorithm
 repo_name: McDermottHealthAI/meds-algorithm
 edit_uri: edit/main/docs/
+hooks:
+  - docs/hooks.py
+  - docs/catalogue.py
+
+extra_css:
+  - assets/prompt-builder.css
+extra_javascript:
+  - assets/prompt-builder.js
+
 docs_dir: docs
 strict: true
-hooks:
-  - docs/catalogue.py
-theme:
-  name: material
-  features:
-    - navigation.sections
-    - content.code.copy
-markdown_extensions:
-  - tables
-  - toc:
-      permalink: true
-  - pymdownx.superfences
 validation:
   nav:
     omitted_files: warn
@@ -25,8 +24,77 @@ validation:
   links:
     not_found: warn
     anchors: warn
+    absolute_links: info
+    unrecognized_links: warn
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
 nav:
-  - Overview: index.md
-  - Implemented algorithms: implemented-algorithms.md
+  - Getting started:
+      - Overview: index.md
+      - Implemented algorithms: implemented-algorithms.md
+      - Concepts: concepts.md
+      - Choosing a profile: profiles.md
+      - Workflow: workflow.md
+  - Building an algorithm:
+      - Implementation prompt builder: prompt-builder.md
+      - Copyable implementation prompt: implementation-prompt.md
+      - Running an algorithm: running.md
+      - Fully manual example: manual-example.md
   - Development:
+      - Core package layout: core-package.md
+      - Template and shared package: shared-package-assessment.md
+      - Migrating to version 4: migration-v4.md
+      - Publishing an algorithm: publishing-algorithms.md
+      - Releasing core and template: releasing.md
+      - Maintaining documentation: documentation.md
+      - Documentation tests: documentation-tests.md
       - Catalogue tests: catalogue-testing.md
+  - Zero-shot algorithms:
+      - Zero-shot in practice: zero-shot.md
+  - Reference:
+      - Specification (normative): reference/spec.md
+      - Manifest fields: reference/manifest.md
+      - Contract API: reference/api.md
+      - Architecture and UML: reference/architecture.md
+      - Tests and acceptance: testing.md
+      - Shared-package tests: reference/tests.md
+      - FAQ: faq.md

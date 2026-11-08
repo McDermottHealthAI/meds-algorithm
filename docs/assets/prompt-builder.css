@@ -1,0 +1,19 @@
+.prompt-builder { --pb-line: var(--md-default-fg-color--lightest, #dce5eb); --pb-bg: var(--md-default-bg-color, #fff); --pb-ink: var(--md-default-fg-color, #182b3d); color: var(--pb-ink); }
+.prompt-builder fieldset { min-width: 0; border: 1px solid var(--pb-line); border-radius: 8px; margin: 1.6em 0; padding: 1em 1.25em; }
+.prompt-builder legend { padding: 0 .4em; font-weight: 700; }
+.prompt-builder label { display: block; margin: .8em 0; font-weight: 600; }
+.prompt-builder .pb-hint { display: block; font-size: .86em; font-weight: 400; opacity: .8; margin: .3em 0; }
+.prompt-builder input:not([type="checkbox"]), .prompt-builder select, .prompt-builder textarea { display: block; width: 100%; min-width: 0; margin-top: .4em; padding: .65em .75em; border: 1px solid var(--pb-line); border-radius: 5px; color: var(--pb-ink); background: var(--pb-bg); font: inherit; font-weight: 400; }
+.prompt-builder input:not([type="checkbox"]) { line-height: 1.4; }
+.prompt-builder textarea { resize: vertical; line-height: 1.5; }
+.prompt-builder [data-prompt-output] { font: .85em/1.6 Consolas, monospace; white-space: pre-wrap; }
+.prompt-builder .pb-check { display: flex; align-items: baseline; gap: .6em; font-weight: 400; }
+.prompt-builder input[type="checkbox"] { flex: 0 0 auto; width: 1em; height: 1em; }
+.prompt-builder .pb-actions { display: flex; flex-wrap: wrap; gap: .7em; margin: 1em 0; }
+.prompt-builder button { padding: .6em 1em; border: 1px solid var(--pb-line); border-radius: 5px; color: var(--pb-ink); background: var(--pb-bg); cursor: pointer; font: inherit; }
+.prompt-builder [data-generate] { background: #116b7b; color: #fff; border-color: #116b7b; }
+.prompt-builder button:disabled { opacity: .45; cursor: not-allowed; }
+.prompt-builder :focus-visible { outline: 3px solid #208bba; outline-offset: 3px; }
+.prompt-builder .pb-status { min-height: 1.6em; }
+.prompt-builder [hidden] { display: none !important; }
+@media (max-width: 600px) { .prompt-builder fieldset { padding: .75em; } }
