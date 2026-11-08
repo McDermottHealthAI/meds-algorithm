@@ -1,6 +1,6 @@
 site_name: MEDS algorithms
 site_description: Shared MEDS algorithm infrastructure and implementation catalogue.
-site_url: https://mcdermotthealthai.github.io/meds-algorithm/
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, "https://meds-algorithm.readthedocs.io/en/latest/"]
 repo_url: https://github.com/McDermottHealthAI/meds-algorithm
 repo_name: McDermottHealthAI/meds-algorithm
 edit_uri: edit/main/docs/

@@ -1,7 +1,7 @@
 name: Docs
 
-# Builds the documentation site on every pull request (strict: warnings fail the build) and publishes it to
-# GitHub Pages on pushes to main. Publishing requires Pages to be enabled with "GitHub Actions" as source.
+# Checks the documentation on every pull request. GitHub Pages publishing remains enabled during the
+# Read the Docs transition; see docs/index.md for the cutover and old-URL redirect steps.
 
 on:
   pull_request:
