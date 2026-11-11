@@ -57,8 +57,12 @@ cohort/target definitions or evaluation validity block dependent work. Independe
 Evaluation tasks, when supplied, are already ready: labels plus task configs, bundle identity and dataset
 context. The builder does not ask the agent to invent tasks or extract new labels. Missing tasks defer
 only the corresponding evaluation. Choose the intended work scope explicitly; demo and full-data runs
-still require their existing human approvals. The [static prompt](#copyable-algorithm-implementation-prompt)
-below is the same maintained source used by the builder.
+still require their existing human approvals. The agent must **not inspect real patient-level records or
+raw MEDS event files directly** (including ad hoc shell/notebook queries or row previews). Use synthetic
+data for local tests. Only a specifically human-approved demo or full-data pipeline may process real
+MEDS records programmatically; run approval never permits viewing, logging or copying raw rows.
+The [static prompt](#copyable-algorithm-implementation-prompt) below is the same maintained source
+used by the builder.
 
 The template supplies instructions, interfaces and executable checks. It does **not** launch an agent
 or run an unattended implementation service. The prompt works as ordinary agent input and includes

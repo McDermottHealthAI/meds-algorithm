@@ -74,6 +74,19 @@ without the existing approvals. Record the mode, routine defaults, unresolved qu
 and explicit decisions in IMPLEMENTATION_REPORT.md under "Scientific assumptions and decisions"; update the
 existing report rather than creating another specification file.
 
+RAW-DATA ACCESS GUARD (all profiles, modes and stages): Do not directly open, read, sample,
+preview, print, grep, query, dump, export or otherwise inspect real patient-level records, raw MEDS
+event files or underlying clinical tables through the agent session, shell commands, notebooks or
+ad hoc scripts. A supplied data path, credentials, exploratory mode or implementation request is
+NOT authorization to inspect raw data. Use synthetic fixtures for implementation and local tests;
+source code, documentation, schemas and non-sensitive metadata may be inspected. Only after explicit
+human approval for a specific demo or full-data gate may the approved, auditable algorithm pipeline
+process real MEDS inputs programmatically for that run. Approval to execute the pipeline does not
+authorize the agent to browse records or expose raw rows in output, logs, reports, chat or commits.
+If direct record inspection seems necessary for debugging, stop and request separate, narrowly scoped
+human approval before doing so. Keep evaluation outcomes out of scoring and use the core key-only
+index reader for prediction keys when the relevant data access is authorized.
+
 For automatic profile selection, choose one or more profiles supported by documented source behavior:
 supervised, finetune, probe, zero_shot_direct, zero_shot_materialized or predict_only. Record evidence for
 each choice and proceed when the evidence is clear. Do not add speculative capabilities merely because
