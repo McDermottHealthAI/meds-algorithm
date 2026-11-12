@@ -40,6 +40,9 @@ test("all source, destination, profile, task, scope and ambiguity modes preserve
             assert(prompt.includes("minimalist, auditable, object-oriented"));
             assert(prompt.includes("Do not generate new tasks,"));
             assert(prompt.includes("In BOTH modes, ambiguities about leakage"));
+            assert(prompt.includes("RAW-DATA ACCESS GUARD (all profiles, modes and stages):"));
+            assert(prompt.includes("NOT authorization to inspect raw data."));
+            assert(prompt.includes("process real MEDS inputs programmatically for that run."));
             assert(prompt.includes("Require review of these decisions before claiming faithful reproduction."));
             assert.equal(prompt.includes("Exploratory mode explicitly enabled:"), exploratory_mode);
             assert.equal(prompt.includes("Confirmation required (default):"), !exploratory_mode);
