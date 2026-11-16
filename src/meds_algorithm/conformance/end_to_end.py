@@ -14,6 +14,7 @@ from meds_algorithm import (
 )
 
 from .assertions import assert_prediction_keys, read_predictions
+from .temporal import assert_future_blind_pipeline, assert_same_predictions
 
 
 def _strip_labels(labels_dir: Path, destination: Path, splits) -> Path:
@@ -64,6 +65,9 @@ def assert_profile_run(result, *, profile, run_e2e, fitted_codes, tmp_path):
     assert_prediction_keys(artifacts[prediction_step], result.labels_dir, result.splits)
 
     assert_label_blind_pipeline(result, profile=profile, run_e2e=run_e2e, tmp_path=tmp_path)
+    # Temporal cutoff (CONTRACT section 8): rewriting every evaluated subject's events after its latest
+    # prediction time must leave every prediction unchanged.
+    assert_future_blind_pipeline(result, profile=profile, run_e2e=run_e2e, tmp_path=tmp_path)
 
     # Absence of transductive fitting (SPEC 2.1): codes that occur only in tuning or held-out subjects must
     # not be part of anything the algorithm fitted.
@@ -124,31 +128,14 @@ def assert_label_blind_pipeline(result, *, profile, run_e2e, tmp_path):
     prediction = blind.artifacts[expected_steps[-1]]
     assert_prediction_keys(prediction, result.labels_dir, result.splits)
     # Do not require the evaluation-only boolean_value on a deliberately unlabelled run.
-    import polars as pl
-
     from ..data.index import read_index
     from ..evaluation.predictions import check_decoded
 
     blind_predictions = read_predictions(prediction, require_truth=False)
     check_decoded(read_index(result.labels_dir, result.splits), blind_predictions)
-    keys = ["subject_id", "prediction_time"]
-    probability = "predicted_boolean_probability"
-    decisions = "predicted_boolean_value" in original.columns
-    columns = [*keys, probability, *(["predicted_boolean_value"] if decisions else [])]
-    # Explicit comparison instead of polars.testing.assert_frame_equal, whose tolerance keywords were
-    # renamed (rtol/atol -> rel_tol/abs_tol) within the supported polars>=1 range.
-    try:
-        a = original.select(columns).sort(keys)
-        b = blind_predictions.select(columns).sort(keys)
-    except pl.exceptions.ColumnNotFoundError as error:
-        raise AssertionError("Label-blind predictions lack a column of the original run") from error
-    same = (
-        a.select(keys).equals(b.select(keys))
-        and ((a[probability] - b[probability]).abs() <= 1e-8 + 1e-6 * b[probability].abs()).all()
-        and (not decisions or a["predicted_boolean_value"].equals(b["predicted_boolean_value"]))
+    assert_same_predictions(
+        original,
+        blind_predictions,
+        message="Predictions changed when forbidden labels were removed; fix leakage or make the "
+        "conformance fixture reproducible with the recorded seed",
     )
-    if not same:
-        raise AssertionError(
-            "Predictions changed when forbidden labels were removed; fix leakage or make the "
-            "conformance fixture reproducible with the recorded seed"
-        )

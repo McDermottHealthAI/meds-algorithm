@@ -24,7 +24,7 @@ local processes and temporary files. The default suite does not opt in to MEDS-D
 Passing establishes the checked software boundaries, not clinical validity, numerical equivalence to a
 paper, GPU correctness or absence of all leakage. Algorithm repositories must supply scientific tests,
 cutoff/frozen-weight checks and end-to-end adapters for their concrete implementations. The label-blind
-rerun is an adversarial check, not a filesystem sandbox or proof against malicious code.
+and future-blind reruns are adversarial checks, not a filesystem sandbox or proof against malicious code.
 
 ## Downstream acceptance suite
 
@@ -49,7 +49,8 @@ in the generated `tests/e2e.py` and the shared `E2EResult`/`MEDSDevRun` types.
 |---|---|---|
 | `test_profile_implementations_match_contract` | Compares each registered profile's commands with the core lifecycle. | Detect incorrect registration or dispatch wiring. |
 | `test_algorithm_configuration_roundtrips` | Saves and reloads each supplied concrete configuration. | Preserve settings across independent processes, including required constructor fields. |
-| `test_end_to_end` | Runs each implemented profile and checks artifacts, manifests, coverage, fresh label-blind reruns, split canaries and zero-shot task binding. | Detect broken persistence, label leakage and transductive fitting through the real lifecycle. |
+| `test_end_to_end` | Runs each implemented profile and checks artifacts, manifests, coverage, fresh label-blind reruns, a fresh rerun with every evaluated subject's events after its latest prediction time rewritten (predictions must be bit-identical), split canaries and zero-shot task binding. | Detect broken persistence, label leakage, information from after the prediction time and transductive fitting through the real lifecycle. |
+| `test_null_world_predictions_are_at_chance` | Runs each completed non-zero-shot profile on a null world (homogeneous Poisson events; the label, any event in `(T, T + ln 2 / rate]`, is independent of the history) and applies a one-sided Mann-Whitney test, one key per held-out subject, at `alpha = 1e-3`. | End-to-end smoke alarm for temporal leaks that training learned to exploit, such as a forward time gap to the next real event. `run_e2e` must accept the `null_world` dataset with its test settings. |
 | `test_completed_algorithm_has_a_completed_report` | Validates report evidence for every completed profile. | Prevent incomplete profiles from masking unsupported completion claims. |
 | `test_algorithm_yaml_is_a_meds_dev_descriptor` | Checks each profile descriptor's required structure. | Catch packaging errors before integration. |
 | `test_slurm_dry_run_is_non_mutating` | Runs every profile's launcher with example inputs, checks the file inventory is unchanged and all commands are listed. | Inspect execution plans without submitting work; this checks file creation/removal, not changes to existing file contents. |
@@ -122,6 +123,19 @@ canonical and is rendered in the template documentation rather than copied into 
 | `test_nn_config_rejects_invalid_values_from_python_and_files` | Parametrizes wrong types, nonfinite and out-of-range neural settings. | Enforce the same invariants for Python construction and decoded configuration. |
 | `test_nn_config_requires_explicit_training_settings` | Rejects missing learning rate/batch size and checks classical config independence. | Do not invent universal training defaults or require neural settings for classical algorithms. |
 | `test_repository_records_nn_settings_from_config_file` | Dispatches with a file override and checks resolved saved config and manifest. | Ensure experiment settings actually reach the algorithm and persisted provenance. |
+
+### test_temporal.py
+
+[Source](https://github.com/McDermottHealthAI/meds-algorithm/blob/main/tests/test_temporal.py)
+
+| Test | What it checks | Why it exists |
+|---|---|---|
+| `test_null_world_shape` | Builds a null world and checks one key per held-out subject, two per training subject, prevalence near 0.5 and records that run past the label horizon. | Keep held-out keys independent and record ends uninformative, so the chance-level test is exact. |
+| `test_causal_scores_are_at_chance_and_leaky_scores_are_caught` | Scores keys by hours since the last event (causal) and by hours to the next event (a NOAH-style forward-gap leak). | Show that the chance-level check passes a causal score and fails a leaky one. |
+| `test_perturbation_keeps_history_and_rewrites_only_indexed_futures` | Compares histories up to every indexed time, the rewritten future, the vocabulary and untouched training subjects. | Guarantee the future-blind rerun changes nothing an honest algorithm may read. |
+| `test_future_blind_rerun_passes_causal_and_fails_leaky` | Runs the future-blind rerun on the causal and the leaky toy algorithm. | Show that any dependence on the future fails without a statistical threshold. |
+| `test_mann_whitney_is_calibrated_and_handles_ties` | Checks the rejection rate under the null with heavy ties, constant scores, perfect separation and one-class input. | Keep the chance-level test's false-positive rate at `alpha`. |
+| `test_perturbation_keeps_tie_order_and_never_copies_objects` | Rewrites a future next to ties at one time and an object-link row. | MEDS orders ties by row and objects are single acquisitions; reordering or duplicating either would fail honest algorithms. |
 
 ### test_conformance.py
 
