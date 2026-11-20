@@ -325,6 +325,19 @@ dry-run, and its real end-to-end chain. The rendered `tests/test_end_to_end.py` 
   the integer `seed` override, seed every RNG/framework/subprocess and use deterministic fixture settings.
   `attach_ground_truth` returns predictions unchanged on an unlabelled index. This tests outcome
   independence on the exercised fixture, not every possible code path.
+- **Temporal cutoff (future perturbation):** the complete lifecycle runs again on a copy of the MEDS
+  dataset in which every evaluated subject's events after its latest indexed prediction time are deleted
+  and replaced by plain events copied from the same shard at log-uniform offsets, many within seconds of
+  `T` (`conformance.temporal.perturb_future`). Histories at every indexed time, including the row order
+  of ties, are unchanged, so probabilities MUST be bit-identical by key. Any path from the future to a
+  prediction fails this check, even one the fitted model barely uses; no statistical threshold is
+  involved.
+- **Temporal cutoff (null world):** for non-zero-shot profiles, the full lifecycle runs on
+  `conformance.temporal.build_null_world_dataset`, where events follow one homogeneous Poisson process and
+  the label ("any event in `(T, T + ln 2 / rate]`") is independent of everything recorded up to `T`. A
+  one-sided Mann-Whitney test on one key per held-out subject MUST NOT reject chance at `alpha = 1e-3`.
+  This is a smoke alarm for leaks that training learned to exploit; the perturbation check is the gate.
+  `run_e2e` MUST accept this dataset (`dataset.json` names it `null_world`) with its test settings.
 - **Prediction validity:** validate every Parquet shard in both runs, including unique/non-null keys and
   finite probabilities in [0, 1]. No particular shard filename is required.
 - **Transductive fitting:** every tuning and held-out subject carries a canary code that occurs in no
@@ -566,6 +579,7 @@ payloads. Implement these algorithm-specific assertions rather than relying only
 The shared `assert_profile_run` conformance helper reruns the full lifecycle through `run_e2e` with
 forbidden label columns removed. It requires fresh artifacts below a new run directory and preserves
 permitted training/context labels. Include `seed`, `external_meds_dir` and all task inputs in `E2EResult.inputs`
-so the check uses the same histories and task. This detects forbidden reads on the exercised path;
-it does not prove all possible code paths, temporal cutoffs, or absence of labels encoded in other
-features. Implement the corresponding algorithm-specific checks as well.
+so the check uses the same histories and task. The same helper reruns the lifecycle with every evaluated
+subject's future rewritten (`assert_future_blind_pipeline`). These detect forbidden reads and future
+information on the exercised path; they do not prove all possible code paths or absence of labels encoded
+in other features. Implement the corresponding algorithm-specific checks as well.

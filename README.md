@@ -135,7 +135,8 @@ uv build
 Tests inject publication/restoration failures, launch a child from a worker thread, check explicit
 algorithm provenance, reject missing/mixed/overlapping label inputs, and exercise all six lifecycles with
 synthetic command implementations. Full-lifecycle conformance reruns algorithm adapters with forbidden
-outcomes removed and fresh artifacts; algorithm-specific cutoff, frozen-weight, compatibility and primary
+outcomes removed, and again with every evaluated future rewritten, with fresh artifacts; a null-world run checks
+chance-level discrimination of the future; algorithm-specific cutoff, frozen-weight, compatibility and primary
 behavior tests remain required. Package tests do not establish scientific validity of a downstream algorithm.
 
 MEDS-DEV provisioning requires explicit `-m meds_dev` or `-m real_data` selection; setting

@@ -19,10 +19,11 @@ from .assertions import assert_prediction_keys, read_predictions
 from .cases import AlgorithmCase
 from .end_to_end import assert_profile_run
 from .reports import assert_implementation_report
+from .temporal import assert_chance_level, build_null_world_dataset
 
 
 class AlgorithmConformanceTests:
-    """Eight shared acceptance checks, executed against the downstream algorithm."""
+    """Nine shared acceptance checks, executed against the downstream algorithm."""
 
     @pytest.fixture
     def completed_profile(self, algorithm_case: AlgorithmCase, profile):
@@ -60,6 +61,23 @@ class AlgorithmConformanceTests:
             fitted_codes=algorithm_case.fitted_codes,
             tmp_path=tmp_path,
         )
+
+    def test_null_world_predictions_are_at_chance(
+        self, algorithm_case: AlgorithmCase, completed_profile, tmp_path
+    ):
+        """Temporal cutoff: with a future independent of the past, held-out AUROC must be at chance."""
+        if completed_profile.startswith("zero_shot_"):
+            pytest.skip("null world: zero-shot profiles need a task; the future-perturbation rerun covers it")
+        world = build_null_world_dataset(tmp_path / "null-world", seed=0)
+        result = algorithm_case.run_e2e(
+            tmp_path / "null-world-run",
+            profile=completed_profile,
+            seed=0,
+            external_meds_dir=world.meds_dir,
+            external_labels_dir=world.labels_dir,
+            splits=["held_out"],
+        )
+        assert_chance_level(result, alpha=1e-3)
 
     def test_completed_algorithm_has_a_completed_report(self, algorithm_case: AlgorithmCase):
         report = (algorithm_case.root / "IMPLEMENTATION_REPORT.md").read_text(encoding="utf-8")

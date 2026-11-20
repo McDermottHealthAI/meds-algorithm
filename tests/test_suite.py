@@ -77,10 +77,11 @@ def test_inherited_suite_collects_every_profile_without_duplicate_base(downstrea
     result = downstream.runpytest_subprocess("--collect-only", "-q", "--strict-markers")
     result.assert_outcomes()  # collection succeeds without executing adapters
     output = result.stdout.str()
-    assert "38 tests collected" in output
+    assert "44 tests collected" in output
     for profile in ALGORITHM_PROFILES:
         for test in (
             "test_end_to_end",
+            "test_null_world_predictions_are_at_chance",
             "test_meds_dev_runs_algorithm_yaml",
             "test_full_dag_on_mimic_iv_demo",
         ):
@@ -92,7 +93,7 @@ def test_stubs_skip_execution_but_contract_and_configs_still_run(downstream):
     result = downstream.runpytest_subprocess(
         "-q", "-k", "end_to_end or profile_implementations or configuration_roundtrips"
     )
-    result.assert_outcomes(passed=7, skipped=6, deselected=25)
+    result.assert_outcomes(passed=7, skipped=6, deselected=31)
 
 
 @pytest.mark.parametrize("selection", [[], ["-m", "not slow"], ["-m", "slow"]])
@@ -101,9 +102,9 @@ def test_completed_integrations_need_explicit_opt_in(downstream, selection):
     conftest.write_text(conftest.read_text().replace("stubs=ALGORITHM_PROFILES", "stubs=()"))
     result = downstream.runpytest_subprocess("-q", "-k", "meds_dev_runs or full_dag", *selection)
     if selection == ["-m", "not slow"]:
-        result.assert_outcomes(deselected=38)
+        result.assert_outcomes(deselected=44)
     else:
-        result.assert_outcomes(skipped=12, deselected=26)
+        result.assert_outcomes(skipped=12, deselected=32)
 
 
 def test_integration_markers_select_only_their_suite(downstream):
@@ -114,7 +115,7 @@ def test_integration_markers_select_only_their_suite(downstream):
         result = downstream.runpytest_subprocess("--collect-only", "-q", "-m", marker)
         assert expected in result.stdout.str()
         assert excluded not in result.stdout.str()
-        assert "6/38 tests collected" in result.stdout.str()
+        assert "6/44 tests collected" in result.stdout.str()
 
 
 def test_mixed_completion_does_not_hide_report_requirements(tmp_path):
