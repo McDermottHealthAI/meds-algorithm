@@ -1,7 +1,7 @@
 # Shared core package
 
-The core lives in its own [repository](https://github.com/McDermottHealthAI/meds-algorithm), pinned by the template to PyPI version `0.4.0a5`.
-See its [layout and usage](https://github.com/McDermottHealthAI/meds-algorithm/blob/v0.4.0a5/README.md) for its artifact, runtime, task, evaluation, integration and conformance APIs.
+The core lives in its own [repository](https://github.com/McDermottHealthAI/meds-algorithm), pinned by the template to PyPI version `0.4.0a6`.
+See its [layout and usage](https://github.com/McDermottHealthAI/meds-algorithm/blob/v0.4.0a6/README.md) for its artifact, runtime, task, evaluation, integration and conformance APIs.
 The [specification](reference/spec.md) and [architecture and UML](reference/architecture.md) are
 rendered directly from this core checkout, the same sources included in its distributions.
 The `latest` documentation follows core `main`; generated algorithms use their pinned installed release.

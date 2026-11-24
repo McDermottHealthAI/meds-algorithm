@@ -145,8 +145,15 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ## Changes
 
-### Unreleased
+### 0.4.0a6 (2026-11-24)
 
+- Add temporal-leakage conformance (`conformance/temporal.py`): `test_end_to_end` reruns the lifecycle with every
+  evaluated subject's events after its latest prediction time rewritten and requires bit-identical predictions;
+  the new inherited `test_null_world_predictions_are_at_chance` runs non-zero-shot profiles on a null world whose
+  future is independent of its past. `run_e2e` adapters must honour a perturbed `external_meds_dir` and accept the
+  `null_world` dataset. The suite grows from 38 to 44 collected tests.
+- Stop the owned process group when the caller is terminated.
+- Add an explicit raw-data access guard to the implementation prompt.
 - Consolidate the template guides, implementation prompt and interactive builder on Read the Docs;
   use Read the Docs as the only documentation host.
 - Configure Read the Docs hosting with the existing MkDocs theme and docs dependency group; update
