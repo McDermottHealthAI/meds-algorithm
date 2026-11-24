@@ -16,9 +16,12 @@ from meds_algorithm import (
     read_index,
 )
 from meds_algorithm.conformance.temporal import (
+    FUTURE_BLIND_ATOL,
+    FUTURE_BLIND_RTOL,
     NULL_WORLD_DATASET,
     assert_chance_level,
     assert_future_blind_pipeline,
+    assert_same_predictions,
     build_null_world_dataset,
     null_auroc_test,
     perturb_future,
@@ -207,3 +210,15 @@ def test_perturbation_keeps_tie_order_and_never_copies_objects(tmp_path):
         future = after.slice(4)  # the old future (X) is gone; 8 new plain rows after T replace it
         assert future.height == 8 and (future["time"] > t0 + timedelta(hours=2)).all()
         assert set(future["code"]) <= {"Z//LAST", "A//FIRST", "M//MIDDLE", "X"}
+
+
+def test_future_blind_tolerance_absorbs_rounding_but_not_leaks():
+    """A leak-free polars score moved by one unit in the last place on a CI runner; a leak moves far more."""
+    keys = {"subject_id": [1, 2], "prediction_time": [0, 0]}
+    original = pl.DataFrame({**keys, "predicted_boolean_probability": [0.5, 1e-3]})
+    rounded = pl.DataFrame({**keys, "predicted_boolean_probability": [math.nextafter(0.5, 1), 1e-3]})
+    leaked = pl.DataFrame({**keys, "predicted_boolean_probability": [0.5 + 1e-9, 1e-3]})
+    check = {"rtol": FUTURE_BLIND_RTOL, "atol": FUTURE_BLIND_ATOL, "message": "moved"}
+    assert_same_predictions(original, rounded, **check)
+    with pytest.raises(AssertionError, match="1 of 2 keys moved"):
+        assert_same_predictions(original, leaked, **check)

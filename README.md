@@ -148,10 +148,13 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 ### 0.4.0a6 (2026-11-24)
 
 - Add temporal-leakage conformance (`conformance/temporal.py`): `test_end_to_end` reruns the lifecycle with every
-  evaluated subject's events after its latest prediction time rewritten and requires bit-identical predictions;
+  evaluated subject's events after its latest prediction time rewritten and requires predictions identical up to floating-point rounding (relative 1e-12);
   the new inherited `test_null_world_predictions_are_at_chance` runs non-zero-shot profiles on a null world whose
   future is independent of its past. `run_e2e` adapters must honour a perturbed `external_meds_dir` and accept the
   `null_world` dataset. The suite grows from 38 to 44 collected tests.
+- The future-blind rerun compares probabilities to a relative tolerance of 1e-12 (`FUTURE_BLIND_RTOL`) instead of
+  bit for bit: a leak-free polars score moved by one unit in the last place on a GitHub runner, while the smallest
+  measured leak moves a probability by about 1e-7.
 - Stop the owned process group when the caller is terminated.
 - Add an explicit raw-data access guard to the implementation prompt.
 - Consolidate the template guides, implementation prompt and interactive builder on Read the Docs;
