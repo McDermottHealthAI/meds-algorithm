@@ -28,6 +28,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 US_PER_HOUR = 3_600_000_000
+# Future-blind comparison: a few units in the last place (see assert_future_blind_pipeline).
+FUTURE_BLIND_RTOL, FUTURE_BLIND_ATOL = 1e-12, 1e-15
 NULL_WORLD_DATASET = "null_world"
 # (code, share of events, numeric mean, numeric sd); a None mean gives an event without a value.
 NULL_WORLD_CODES: tuple[tuple[str, float, float | None, float | None], ...] = (
@@ -297,13 +299,18 @@ def assert_same_predictions(original, other, *, message: str, rtol: float = 1e-6
         )
 
 
-def assert_future_blind_pipeline(result, *, profile, run_e2e, tmp_path, tolerance: float = 0.0) -> None:
+def assert_future_blind_pipeline(
+    result, *, profile, run_e2e, tmp_path, tolerance: float = FUTURE_BLIND_RTOL
+) -> None:
     """Rerun every stage with each evaluated subject's future rewritten; predictions must not move.
 
     Training data, seeds and the inputs at every indexed time are identical in both runs, so a deterministic
-    pipeline reproduces its predictions bit for bit; the default ``tolerance`` is therefore zero. A small
-    leak through a briefly trained conformance model can move a probability by only ~1e-7, which a float
-    tolerance would hide. Pass a relative ``tolerance`` only for a pipeline that is not bitwise reproducible.
+    pipeline reproduces its predictions up to floating-point rounding. The rewritten future changes how rows
+    are laid out in memory, and vectorized float kernels (polars, BLAS) can then round a result differently in
+    the last bit on some CPUs: a leak-free polars score moved by 5.6e-17 on a GitHub runner. The default
+    relative ``tolerance`` (1e-12, a few units in the last place) absorbs that and still catches a small
+    leak through a briefly trained conformance model, which moves a probability by about 1e-7. Pass a larger
+    relative ``tolerance`` only for a pipeline that is not reproducible to that precision.
     """
     from meds_algorithm import ALGORITHM_PROFILES
 
@@ -337,7 +344,7 @@ def assert_future_blind_pipeline(result, *, profile, run_e2e, tmp_path, toleranc
         read_predictions(result.artifacts[steps[-1]], require_truth=False),
         read_predictions(prediction, require_truth=False),
         rtol=tolerance,
-        atol=0.0,
+        atol=FUTURE_BLIND_ATOL,
         message="Predictions changed when only events after every indexed prediction time were rewritten; "
         "information from after the prediction time reaches the prediction",
     )

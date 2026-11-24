@@ -329,7 +329,7 @@ dry-run, and its real end-to-end chain. The rendered `tests/test_end_to_end.py` 
   dataset in which every evaluated subject's events after its latest indexed prediction time are deleted
   and replaced by plain events copied from the same shard at log-uniform offsets, many within seconds of
   `T` (`conformance.temporal.perturb_future`). Histories at every indexed time, including the row order
-  of ties, are unchanged, so probabilities MUST be bit-identical by key. Any path from the future to a
+  of ties, are unchanged, so probabilities MUST be identical by key up to floating-point rounding (relative 1e-12). Any path from the future to a
   prediction fails this check, even one the fitted model barely uses; no statistical threshold is
   involved.
 - **Temporal cutoff (null world):** for non-zero-shot profiles, the full lifecycle runs on
