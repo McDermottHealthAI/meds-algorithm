@@ -7,7 +7,7 @@ from pathlib import Path
 
 from meds_algorithm.artifacts.manifest import digest_file
 from meds_algorithm.runtime.process import run
-from meds_algorithm.runtime.provenance import code_provenance
+from meds_algorithm.runtime.provenance import code_provenance, distribution_provenance
 
 from .planning import RunPlan, StagePlan
 
@@ -21,6 +21,8 @@ class StageJob:
     output_dir: Path
     config_digest: str
     expected_commit: str | None = None
+    # An installed release instead of a checkout: {"module", "name", "version"} that must still be installed.
+    expected_release: dict | None = None
 
     def __call__(self):
         if digest_file(self.output_dir / "algorithm.json") != self.config_digest:
@@ -29,6 +31,15 @@ class StageJob:
             provenance = code_provenance(self.repo)
             if provenance["git_commit"] != self.expected_commit or provenance["dirty"] is not False:
                 raise ValueError("Algorithm checkout changed after SLURM submission")
+        if self.expected_release is not None:
+            installed = distribution_provenance(self.expected_release["module"])
+            expected = {key: self.expected_release[key] for key in ("name", "version")}
+            found = None if installed is None else {key: installed[key] for key in ("name", "version")}
+            if installed is None or installed["editable"] or found != expected:
+                raise ValueError(
+                    "Installed algorithm changed after SLURM submission: "
+                    f"expected {expected}, found {installed}"
+                )
         run(
             self.stage.argv,
             cwd=self.repo,
@@ -83,7 +94,14 @@ class SubmititExecution:
                     parameters["slurm_additional_parameters"] = {"dependency": f"afterok:{jobs[-1].job_id}"}
                 executor.update_parameters(**parameters)
                 job = executor.submit(
-                    StageJob(stage, plan.repo, plan.output_dir, config_digest, plan.provenance["git_commit"])
+                    StageJob(
+                        stage,
+                        plan.repo,
+                        plan.output_dir,
+                        config_digest,
+                        plan.provenance["git_commit"],
+                        _release(plan),
+                    )
                 )
                 jobs.append(job)
                 receipt["jobs"].append({"stage": stage.name, "job_id": job.job_id})
@@ -107,11 +125,20 @@ class RunCoordinator:
 
     def execute(self, plan: RunPlan):
         if plan.execution == "slurm":
-            # Refuse unknown or dirty code before creating files or submitting anything.
+            # Refuse unknown or mutable code before creating files or submitting anything: either a clean
+            # committed checkout, or a released (non-editable) installed distribution whose version workers
+            # check again.
             current = code_provenance(plan.repo)
-            if not current["git_commit"] or current["dirty"] is not False or current != plan.provenance:
-                raise ValueError("SLURM requires an unchanged, clean committed algorithm checkout")
-            if plan.output_dir.is_relative_to(plan.repo):
+            planned = {key: plan.provenance.get(key) for key in current}
+            if current["git_commit"]:
+                if current["dirty"] is not False or current != planned:
+                    raise ValueError("SLURM requires an unchanged, clean committed algorithm checkout")
+            elif _release(plan) is None:
+                raise ValueError(
+                    "SLURM requires an unchanged, clean committed algorithm checkout or an installed "
+                    "released (non-editable) distribution of the algorithm"
+                )
+            if current["git_commit"] and plan.output_dir.is_relative_to(plan.repo):
                 ignored = subprocess.run(
                     ["git", "-C", str(plan.repo), "check-ignore", "--quiet", str(plan.output_dir)],
                     check=False,
@@ -126,3 +153,13 @@ class RunCoordinator:
         config.write_text(json.dumps(plan.algorithm_configuration, indent=2), encoding="utf-8")
         backend = LocalExecution() if plan.execution == "local" else SubmititExecution()
         backend.execute(plan, digest_file(config))
+
+
+def _release(plan: RunPlan) -> dict | None:
+    """The planned installed release (``module``, ``name``, ``version``) when no Git commit identifies the
+    code and the distribution is not editable; ``None`` otherwise."""
+    distribution = plan.provenance.get("distribution")
+    if plan.provenance.get("git_commit") or not distribution or distribution["editable"]:
+        return None
+    module = plan.algorithm_configuration["type"].rsplit(".", 1)[0]
+    return {"module": module, "name": distribution["name"], "version": distribution["version"]}

@@ -260,7 +260,16 @@ def test_submitit_wires_resources_dependencies_receipts_and_cancellation(setup, 
     )
 
 
-def test_slurm_refuses_dirty_or_unknown_checkout(setup):
+def _installed(monkeypatch, release):
+    """Pretend the example algorithm comes from ``release`` (``None``: no installed distribution)."""
+    from meds_algorithm.orchestration import execution, planning
+
+    monkeypatch.setattr(planning, "distribution_provenance", lambda module: release)
+    monkeypatch.setattr(execution, "distribution_provenance", lambda module: release)
+
+
+def test_slurm_refuses_dirty_or_unknown_checkout(setup, monkeypatch):
+    _installed(monkeypatch, None)
     plan = setup.planner.resolve(replace(setup.config, execution="slurm"))
     with pytest.raises(ValueError, match="clean committed"):
         RunCoordinator().execute(plan)
@@ -271,6 +280,46 @@ def test_slurm_refuses_dirty_or_unknown_checkout(setup):
     (setup.repo / "untracked").touch()
     with pytest.raises(ValueError, match="clean committed"):
         RunCoordinator().execute(plan)
+
+
+def test_slurm_submits_an_installed_release_and_workers_check_its_version(setup, monkeypatch):
+    """Without a Git checkout, a released (non-editable) installed distribution identifies the code."""
+    import submitit
+
+    release = {"name": "my-algorithm", "version": "1.2.3", "editable": False}
+    _installed(monkeypatch, release)
+    plan = setup.planner.resolve(replace(setup.config, execution="slurm", stages=["preprocess_data"]))
+    assert plan.provenance["git_commit"] is None and plan.provenance["distribution"] == release
+    submitted = []
+
+    class Executor:
+        def __init__(self, **kwargs):
+            pass
+
+        def update_parameters(self, **kwargs):
+            pass
+
+        def submit(self, callable):
+            submitted.append(callable)
+            return SimpleNamespace(job_id="1", cancel=lambda: None)
+
+    monkeypatch.setattr(submitit, "AutoExecutor", Executor)
+    RunCoordinator().execute(plan)
+    job = submitted[0]
+    assert job.expected_commit is None and job.expected_release["version"] == "1.2.3"
+    assert job() == "preprocess_data"  # the same release is still installed: the stage runs
+    _installed(monkeypatch, {**release, "version": "1.2.4"})
+    with pytest.raises(ValueError, match="Installed algorithm changed"):
+        job()
+
+    # An editable install points at mutable source: refused before any file is written.
+    _installed(monkeypatch, {**release, "editable": True})
+    editable = setup.planner.resolve(
+        replace(setup.config, execution="slurm", output_dir=str(setup.repo.parent / "editable"))
+    )
+    with pytest.raises(ValueError, match="installed released"):
+        RunCoordinator().execute(editable)
+    assert not editable.output_dir.exists()
 
 
 def test_slurm_rejects_output_that_would_dirty_checkout(setup):
