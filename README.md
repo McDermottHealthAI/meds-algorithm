@@ -145,6 +145,12 @@ training. Keep each algorithm's data-access and cluster approval rules in its ow
 
 ## Changes
 
+### 0.4.0a7 (2026-11-24)
+
+- `execution=slurm` accepts a released, non-editable installed distribution of the algorithm (e.g. installed from
+  PyPI) as well as a clean committed checkout. The plan records the distribution's name and version, and each SLURM
+  worker checks that the same version is still installed before running its stage.
+
 ### 0.4.0a6 (2026-11-24)
 
 - Add temporal-leakage conformance (`conformance/temporal.py`): `test_end_to_end` reruns the lifecycle with every
