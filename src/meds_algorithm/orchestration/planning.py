@@ -8,7 +8,7 @@ from omegaconf import OmegaConf
 
 from meds_algorithm import STEP_SPECS, CommandName
 from meds_algorithm.algorithms import request_type
-from meds_algorithm.runtime.provenance import code_provenance
+from meds_algorithm.runtime.provenance import code_provenance, distribution_provenance
 
 from .config import Resources, RunConfig
 
@@ -193,6 +193,6 @@ class RunPlanner:
                 "type": f"{algorithm_type.__module__}.{algorithm_type.__qualname__}",
                 "values": algorithm.to_dict(),
             },
-            code_provenance(repo),
+            {**code_provenance(repo), "distribution": distribution_provenance(algorithm_type.__module__)},
             tuple(plans),
         )

@@ -105,9 +105,11 @@ local execution does not reserve or isolate those resources. Output streams go d
 log files instead of accumulating training logs in the coordinator's memory.
 
 SLURM execution uses Submitit directly to submit one job per stage, chained with `afterok` dependencies.
-It returns after submission. A clean committed algorithm checkout is required; workers check that
-the commit remains unchanged and the checkout remains clean before starting. Put outputs outside the
-checkout or in a Git-ignored directory. Use a shared filesystem and the same installed Python
+It returns after submission. The algorithm code must be identifiable: either a clean committed
+algorithm checkout (workers check that the commit remains unchanged and the checkout remains clean
+before starting; put outputs outside the checkout or in a Git-ignored directory), or a released,
+non-editable installed distribution, e.g. `uv pip install my-algorithm==1.2.3` (workers check that the
+same name and version are still installed). An editable install outside a Git checkout is refused. Use a shared filesystem and the same installed Python
 environment on the submitting and compute hosts. The coordinator does not install environments or
 snapshot the source tree. Avoid editing the checkout while jobs are queued/running.
 
