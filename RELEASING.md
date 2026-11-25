@@ -38,7 +38,7 @@ and [publishing action](https://docs.pypi.org/trusted-publishers/using-a-publish
 
 ## 2. Release the shared package first
 
-Current candidate: **0.4.0a6**. Run the following in Bash/WSL with Git, GitHub CLI and uv installed.
+Current candidate: **0.4.0a7**. Run the following in Bash/WSL with Git, GitHub CLI and uv installed.
 Use the reviewed `main` commit, and wait for its CI checks before tagging. Do not move or reuse a
 published release tag/version; increment `project.version` for a replacement.
 
@@ -53,11 +53,11 @@ uv run ruff format --check .
 uv run pytest -q
 uv build
 uvx --from 'twine>=6' twine check --strict dist/*
-git tag v0.4.0a6
-git push origin v0.4.0a6
+git tag v0.4.0a7
+git push origin v0.4.0a7
 
 gh workflow run publish.yml --repo McDermottHealthAI/meds-algorithm \
-  --ref v0.4.0a6 -f index=testpypi
+  --ref v0.4.0a7 -f index=testpypi
 gh run list --repo McDermottHealthAI/meds-algorithm --workflow publish.yml --limit 5
 # Select the run created above and watch it:
 gh run watch RUN_ID --repo McDermottHealthAI/meds-algorithm --exit-status
@@ -76,7 +76,7 @@ check_env=$(mktemp -d)
 uv venv "$check_env"
 uv pip install --python "$check_env/bin/python" 'pyyaml>=6'
 uv pip install --python "$check_env/bin/python" --no-deps \
-  --index-url https://test.pypi.org/simple/ 'meds-algorithm==0.4.0a6'
+  --index-url https://test.pypi.org/simple/ 'meds-algorithm==0.4.0a7'
 "$check_env/bin/python" -I tests/wheel_smoke.py
 uv pip check --python "$check_env/bin/python"
 ```
@@ -85,11 +85,11 @@ After the test release is verified, publish the same tag to PyPI and approve its
 
 ```bash
 gh workflow run publish.yml --repo McDermottHealthAI/meds-algorithm \
-  --ref v0.4.0a6 -f index=pypi
+  --ref v0.4.0a7 -f index=pypi
 # Find and watch the new run as above. After it succeeds:
 pypi_env=$(mktemp -d)
 uv venv "$pypi_env"
-uv pip install --python "$pypi_env/bin/python" 'meds-algorithm==0.4.0a6'
+uv pip install --python "$pypi_env/bin/python" 'meds-algorithm==0.4.0a7'
 "$pypi_env/bin/python" -I tests/wheel_smoke.py
 uv pip check --python "$pypi_env/bin/python"
 ```
@@ -99,7 +99,7 @@ See the official [TestPyPI guide](https://packaging.python.org/en/latest/guides/
 
 ## 3. Cut over and release the template
 
-Only after `meds-algorithm==0.4.0a6` installs from PyPI, follow the
+Only after `meds-algorithm==0.4.0a7` installs from PyPI, follow the
 [template release guide](https://github.com/McDermottHealthAI/MEDS_algorithm_template/blob/main/RELEASING.md).
 It switches the development and generated dependencies from the Git pin to the released package,
 updates the lockfile/docs, and publishes the generator at **0.4.0a2** with tag **v0.4.0a2**.
