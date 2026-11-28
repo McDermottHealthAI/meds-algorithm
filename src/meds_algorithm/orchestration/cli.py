@@ -39,4 +39,20 @@ def main(repository, *, module: str, argv: list[str] | None = None):
         print(json.dumps(plan.to_dict(), indent=2))
     else:
         RunCoordinator().execute(plan)
-        print(f"{'Submitted' if plan.execution == 'slurm' else 'Completed'}: {plan.output_dir}")
+        if plan.execution == "slurm":
+            print(submission_summary(plan.output_dir))
+        else:
+            print(f"Completed: {plan.output_dir}")
+
+
+def submission_summary(output_dir: Path) -> str:
+    """What a SLURM submission prints: the run directory, each stage's job ID, and where they are recorded."""
+    receipt = output_dir / "submission.json"
+    jobs = json.loads(receipt.read_text(encoding="utf-8"))["jobs"]
+    width = max((len(job["stage"]) for job in jobs), default=0)
+    lines = [
+        f"Submitted: {output_dir}",
+        *(f"  {job['stage']:<{width}}  job {job['job_id']}" for job in jobs),
+        f"Job IDs are recorded in {receipt}; step logs are in {output_dir / 'logs'}.",
+    ]
+    return "\n".join(lines)

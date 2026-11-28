@@ -158,7 +158,8 @@ The existing runner saves `config.json`, `request.json` and `manifest.yaml` insi
 artifact, including resolved algorithm settings, input identities, seed and resource measurements.
 Scheduling settings are in `plan.json`; they do not alter algorithm-compatibility digests.
 
-SLURM additionally writes Submitit's logs and a `submission.json` receipt with stage/job IDs.
+SLURM additionally writes Submitit's logs and a `submission.json` receipt with stage/job IDs; the command prints
+each stage's job ID and the receipt's path after submission.
 If submission fails partway through, the coordinator attempts to cancel already submitted jobs and
 records cancellation errors. `submitted` means accepted by the scheduler, not completed successfully.
 Monitor job IDs with the cluster's normal tools and inspect artifacts/logs before claiming success.

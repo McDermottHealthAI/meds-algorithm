@@ -133,6 +133,25 @@ def test_cli_dry_run_has_no_output_or_scheduler_side_effects(setup, monkeypatch,
     assert set(setup.repo.parent.rglob("*")) == before
 
 
+def test_slurm_submission_prints_job_ids_and_receipt(tmp_path):
+    from meds_algorithm.orchestration.cli import submission_summary
+
+    (tmp_path / "submission.json").write_text(
+        json.dumps(
+            {
+                "status": "submitted",
+                "jobs": [{"stage": "preprocess_data", "job_id": "11"}, {"stage": "pretrain", "job_id": "12"}],
+            }
+        )
+    )
+    assert submission_summary(tmp_path).splitlines() == [
+        f"Submitted: {tmp_path}",
+        "  preprocess_data  job 11",
+        "  pretrain         job 12",
+        f"Job IDs are recorded in {tmp_path / 'submission.json'}; step logs are in {tmp_path / 'logs'}.",
+    ]
+
+
 def test_missing_inputs_and_invalid_resources_fail_before_execution(setup):
     with pytest.raises(ValueError, match="labels_dir"):
         setup.planner.resolve(replace(setup.config, inputs=RunInputs(meds_dir=str(setup.inputs))))
